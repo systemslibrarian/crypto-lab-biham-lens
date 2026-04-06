@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>biham-lens — Differential Cryptanalysis Demo</title>
+    <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    <div id="app">
+        <header class="header">
+            <div class="header-content">
+                <h1>biham-lens</h1>
+                <p class="subtitle">Differential Cryptanalysis of a Toy SPN Cipher</p>
+                <p class="attribution">by Eli Biham &amp; Adi Shamir (1990)</p>
+            </div>
+        </header>
+
+        <nav class="tabs" role="tablist" aria-label="Demo sections">
+            <button class="tab-button active" data-tab="attack" role="tab" aria-selected="true" aria-controls="attack" id="tab-attack">Live Attack</button>
+            <button class="tab-button" data-tab="trace" role="tab" aria-selected="false" aria-controls="trace" id="tab-trace">Differential Trace</button>
+            <button class="tab-button" data-tab="sbox" role="tab" aria-selected="false" aria-controls="sbox" id="tab-sbox">S-box Analysis</button>
+            <button class="tab-button" data-tab="history" role="tab" aria-selected="false" aria-controls="history" id="tab-history">Historical Impact</button>
+            <button class="tab-button" data-tab="serpent" role="tab" aria-selected="false" aria-controls="serpent" id="tab-serpent">Why Serpent Survived</button>
+        </nav>
+
+        <main id="main-content">
+        <!-- TAB 1: Live Attack -->
+        <div id="attack" class="tab-content active" role="tabpanel" aria-labelledby="tab-attack" tabindex="0">
+            <div class="tab-inner">
+                <h2>Live Differential Attack</h2>
+                <p class="tab-explanation">
+                    This tab demonstrates a real chosen-plaintext differential attack on the 4-round toy SPN cipher.
+                    We exploit a high-probability differential to recover the last round subkey.
+                </p>
+
+                <div class="attack-container">
+                    <div class="input-section">
+                        <h3>Step 1: Choose Plaintext Difference</h3>
+                        <div class="form-group">
+                            <label for="p1">Plaintext P₁ (hex):</label>
+                            <input type="text" id="p1" value="42" maxlength="2" class="hex-input">
+                        </div>
+                        <div class="form-group">
+                            <label for="p2">Plaintext P₂ (hex):</label>
+                            <input type="text" id="p2" value="43" maxlength="2" class="hex-input">
+                        </div>
+                        <div class="form-group">
+                            <label>Difference: <span id="plainDiff" class="mono">0x01</span></label>
+                        </div>
+                    </div>
+
+                    <div class="control-section">
+                        <h3>Step 2: Collect Ciphertext Pairs</h3>
+                        <button id="add100" class="btn btn-primary">+ Add 100 Pairs</button>
+                        <button id="add500" class="btn btn-primary">+ Add 500 Pairs</button>
+                        <button id="add1000" class="btn btn-primary">+ Add 1000 Pairs</button>
+                        <button id="clearPairs" class="btn btn-secondary">Clear All Pairs</button>
+                        <p id="pairStatus" class="status" aria-live="polite">0 pairs collected. Need ~500 for reliable recovery.</p>
+                    </div>
+
+                    <div class="attack-section">
+                        <h3>Step 3: Run Attack</h3>
+                        <button id="runAttack" class="btn btn-danger">Run Attack on Last Round</button>
+                        <p id="attackStatus" class="status" aria-live="polite">Ready to analyze pairs.</p>
+                    </div>
+                </div>
+
+                <div class="results-section" id="resultsSection" style="display: none;">
+                    <h3>Attack Results</h3>
+                    <div class="results-grid">
+                        <div class="result-card">
+                            <div class="result-label">Recovered Key</div>
+                            <div class="result-value mono" id="recoveredKey">0x00</div>
+                        </div>
+                        <div class="result-card">
+                            <div class="result-label">Rank of Correct Key</div>
+                            <div class="result-value mono" id="correctKeyRank">—</div>
+                        </div>
+                        <div class="result-card">
+                            <div class="result-label">Bias of Top Candidate</div>
+                            <div class="result-value mono" id="topBias">—</div>
+                        </div>
+                    </div>
+
+                    <h4>Bias Distribution (Top 10 Candidates)</h4>
+                    <figure role="img" aria-label="Bar chart showing bias counts for the top 10 candidate subkeys">
+                        <canvas id="biasChart" width="600" height="300"></canvas>
+                    </figure>
+
+                    <div id="successMessage" style="display: none;" class="success-card">
+                        <div class="success-icon">✓</div>
+                        <h4>Key Material Recovered!</h4>
+                        <p>The attack successfully identified the last round subkey using differential cryptanalysis.</p>
+                        <p><strong>Actual Key K₄:</strong> <span class="mono" id="actualKey">0x00</span></p>
+                        <p><strong>Recovered:</strong> <span class="mono" id="recoveredKeyText">0x00</span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: Differential Trace -->
+        <div id="trace" class="tab-content" role="tabpanel" aria-labelledby="tab-trace" tabindex="0">
+            <div class="tab-inner">
+                <h2>Differential Trace Visualization</h2>
+                <p class="tab-explanation">
+                    Watch how XOR differences propagate through the rounds of the cipher via S-box substitution and bit permutation.
+                </p>
+
+                <div class="trace-container">
+                    <div class="trace-controls">
+                        <button id="traceNext" class="btn btn-primary">Trace Next Stage</button>
+                        <button id="traceReset" class="btn btn-secondary">Reset</button>
+                        <p id="traceStage" class="status" aria-live="polite">Input difference</p>
+                    </div>
+
+                    <div class="trace-stages">
+                        <div class="stage-display">
+                            <h4>Input Difference</h4>
+                            <div class="diff-display">
+                                <div class="byte-bits" id="stageBits0"></div>
+                                <div class="diff-info">
+                                    <span>Value: <span class="mono" id="stageValue0">0x00</span></span>
+                                    <span>Active bits: <span id="stageActive0">0</span></span>
+                                    <span>Probability: <span id="stageProbability0">1.00</span></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stage-arrow">→</div>
+                        <div class="stage-display">
+                            <h4>After S-box (Round 1)</h4>
+                            <div class="diff-display">
+                                <div class="byte-bits" id="stageBits1"></div>
+                                <div class="diff-info">
+                                    <span>Value: <span class="mono" id="stageValue1">?</span></span>
+                                    <span>Active bits: <span id="stageActive1">—</span></span>
+                                    <span>Probability: <span id="stageProbability1">—</span></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stage-arrow">→</div>
+                        <div class="stage-display">
+                            <h4>After Permutation (Round 1)</h4>
+                            <div class="diff-display">
+                                <div class="byte-bits" id="stageBits2"></div>
+                                <div class="diff-info">
+                                    <span>Value: <span class="mono" id="stageValue2">?</span></span>
+                                    <span>Active bits: <span id="stageActive2">—</span></span>
+                                    <span>Probability: <span id="stageProbability2">—</span></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stage-legend">
+                        <div class="legend-item"><span class="bit active"></span> Active bit (different)</div>
+                        <div class="legend-item"><span class="bit inactive"></span> Inactive bit (same)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: S-box Analysis -->
+        <div id="sbox" class="tab-content" role="tabpanel" aria-labelledby="tab-sbox" tabindex="0">
+            <div class="tab-inner">
+                <h2>S-box Analysis</h2>
+                <p class="tab-explanation">
+                    The S-box is the only non-linear component of the cipher. Its differential properties determine the strength of the cipher against differential attacks.
+                </p>
+
+                <div class="sbox-analysis">
+                    <div class="sbox-grid-container">
+                        <h3>S-box Substitution</h3>
+                        <div class="sbox-grid" id="sboxGrid" role="grid" aria-label="S-box substitution values"></div>
+                        <p class="grid-explanation">Input (outer number) → Output (colored square)</p>
+                    </div>
+
+                    <div class="ddt-container">
+                        <h3>Difference Distribution Table (DDT)</h3>
+                        <p class="ddt-explanation">
+                            Rows: Input Difference • Columns: Output Difference • Colors show count (0-255 pairs)
+                        </p>
+                        <div class="ddt-grid" id="ddtGrid" role="grid" aria-label="Difference Distribution Table"></div>
+                        <div id="ddtClickInfo" aria-live="polite" style="display: none; margin-top: 1rem;">
+                            <p><strong>Clicked cell:</strong> ΔIn = <span id="ddtInputDiff">0</span>, ΔOut = <span id="ddtOutputDiff">0</span></p>
+                            <p><strong>Count:</strong> <span id="ddtCount">0</span> out of 16 input pairs</p>
+                            <p><strong>Probability:</strong> <span id="ddtProb">0%</span></p>
+                            <p id="ddtExploitable"></p>
+                        </div>
+                    </div>
+
+                    <div class="sbox-assessment">
+                        <h3>S-box Strength Assessment</h3>
+                        <div id="sboxAssessmentContent"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: Historical Impact -->
+        <div id="history" class="tab-content" role="tabpanel" aria-labelledby="tab-history" tabindex="0">
+            <div class="tab-inner">
+                <h2>Historical Impact: Differential Cryptanalysis</h2>
+                <p class="tab-explanation">
+                    Differential cryptanalysis was the cryptanalytic breakthrough of the late 20th century.
+                </p>
+
+                <div class="history-container">
+                    <div class="attribution-grid">
+                        <div class="attribution-card">
+                            <h3>Eli Biham</h3>
+                            <p><strong>Affiliation:</strong> Technion — Israel Institute of Technology</p>
+                            <p class="attribution-bio">
+                                Co-inventor of differential cryptanalysis. Later designed Serpent cipher to resist his own technique.
+                            </p>
+                        </div>
+                        <div class="attribution-card">
+                            <h3>Adi Shamir</h3>
+                            <p><strong>Affiliation:</strong> Weizmann Institute of Science, Israel</p>
+                            <p class="attribution-bio">
+                                Co-inventor of differential cryptanalysis. Legendary cryptographer and co-founder of RSA cryptosystem.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="timeline">
+                        <h3>Timeline of Discovery</h3>
+                        <div class="timeline-stepper">
+                            <button id="timelineStep0" class="timeline-step active">
+                                <span class="year">1970s</span>
+                                <span class="event">NSA's Secret</span>
+                            </button>
+                            <button id="timelineStep1" class="timeline-step">
+                                <span class="year">1990</span>
+                                <span class="event">Public Discovery</span>
+                            </button>
+                            <button id="timelineStep2" class="timeline-step">
+                                <span class="year">1993</span>
+                                <span class="event">Coppersmith Confirms</span>
+                            </button>
+                            <button id="timelineStep3" class="timeline-step">
+                                <span class="year">1998</span>
+                                <span class="event">Serpent Combat</span>
+                            </button>
+                            <button id="timelineStep4" class="timeline-step">
+                                <span class="year">Today</span>
+                                <span class="event">Legacy</span>
+                            </button>
+                        </div>
+
+                        <div id="timelineContent" class="timeline-content">
+                            <!-- Populated by JavaScript -->
+                        </div>
+
+                        <div class="citation">
+                            <p><strong>Original Paper:</strong></p>
+                            <p>
+                                Eli Biham and Adi Shamir.
+                                "Differential Cryptanalysis of DES-like Cryptosystems."
+                                <em>Journal of Cryptology,</em> vol. 4, no. 1, pp. 3–72, 1991.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 5: Why Serpent Survived -->
+        <div id="serpent" class="tab-content" role="tabpanel" aria-labelledby="tab-serpent" tabindex="0">
+            <div class="tab-inner">
+                <h2>Why Serpent Survived: Defense Against Differential Cryptanalysis</h2>
+                <p class="tab-explanation">
+                    Eli Biham designed Serpent specifically to be immune to differential cryptanalysis and other attacks he had discovered.
+                </p>
+
+                <div class="serpent-container">
+                    <div class="cipher-comparison">
+                        <h3>Cipher Defense Comparison</h3>
+                        <table class="comparison-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Property</th>
+                                    <th scope="col">DES (1977)</th>
+                                    <th scope="col">AES (2001)</th>
+                                    <th scope="col">Serpent (1998)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>S-box Max DDT</td>
+                                    <td class="weak">8</td>
+                                    <td class="strong">4</td>
+                                    <td class="strong">4</td>
+                                </tr>
+                                <tr>
+                                    <td>Rounds</td>
+                                    <td>16</td>
+                                    <td>10/12/14</td>
+                                    <td class="strong">32</td>
+                                </tr>
+                                <tr>
+                                    <td>Differential Reach</td>
+                                    <td class="weak">8 rounds</td>
+                                    <td class="strong">Beyond attack</td>
+                                    <td class="strong">Beyond attack</td>
+                                </tr>
+                                <tr>
+                                    <td>Design Philosophy</td>
+                                    <td>Proven secure (classified)</td>
+                                    <td>Resistant to known attacks</td>
+                                    <td class="strong">Hardened by attack inventor</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="portfolio-thread">
+                        <h3>Portfolio Thread: A Cipher's Journey</h3>
+                        <p>
+                            This demo is part of a series exploring cipher design and cryptanalysis:
+                        </p>
+                        <ul class="thread-list">
+                            <li><strong>biham-lens</strong> (you are here) — Attack-side: differential cryptanalysis</li>
+                            <li><strong>iron-serpent</strong> — Defense-side: Serpent cipher designed to defeat differential attacks</li>
+                            <li><strong>dead-sea-cipher</strong> — Historical failures: why ciphers break</li>
+                            <li><strong>shamir-gate</strong> — The mind of Adi Shamir: RSA, differential cryptanalysis, secret sharing</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </main>
+
+        <footer class="footer">
+            <p>Differential cryptanalysis — The breakthrough that changed cryptography forever.</p>
+            <p class="footer-attribution">
+                Based on "Differential Cryptanalysis of DES-like Cryptosystems" by Eli Biham &amp; Adi Shamir (Journal of Cryptology, 1991)
+            </p>
+        </footer>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
