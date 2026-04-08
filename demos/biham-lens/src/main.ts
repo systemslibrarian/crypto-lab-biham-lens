@@ -5,7 +5,7 @@
  * by Eli Biham and Adi Shamir, Journal of Cryptology, 1991
  */
 
-import { generateKey, encrypt } from './crypto/spn.js';
+import { generateKey } from './crypto/spn.js';
 import type { SPNKey } from './crypto/spn.js';
 import { computeDDT, verifyDDTProperties } from './crypto/ddt.js';
 import { getSbox } from './crypto/sbox.js';

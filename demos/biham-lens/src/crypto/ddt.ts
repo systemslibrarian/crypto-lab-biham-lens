@@ -9,8 +9,6 @@
  * when passed through an S-box.
  */
 
-import { sboxApply } from './sbox.js';
-
 /**
  * Entry in the Difference Distribution Table
  */

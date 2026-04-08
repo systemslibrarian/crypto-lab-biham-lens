@@ -11,7 +11,6 @@
 
 import { computeDDT, getDifferentialProbability } from './ddt.js';
 import { getSbox } from './sbox.js';
-import { encryptRounds } from './spn.js';
 import type { SPNKey } from './spn.js';
 
 /**
