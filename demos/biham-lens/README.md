@@ -2,154 +2,41 @@
 
 **[▶ Live Demo](https://systemslibrarian.github.io/crypto-lab-biham-lens/)**
 
-A browser-based interactive demonstration of **differential cryptanalysis**, the cryptanalytic breakthrough co-invented by **Eli Biham** (Technion, Israel) and **Adi Shamir** (Weizmann Institute, Israel) in 1990.
+---
 
-This demo showcases the attack against a simplified 4-round SPN (Substitution-Permutation Network) toy cipher using real arithmetic. The attack recovers the final round's subkey using chosen-plaintext pairs and statistical bias.
+## What It Is
 
-## What is Differential Cryptanalysis?
+Differential cryptanalysis is a chosen-plaintext attack technique that recovers secret key material from block ciphers by exploiting statistical biases in how XOR differences propagate through substitution and permutation layers. Invented by Eli Biham and Adi Shamir in 1990, it operates in the symmetric-key model — the attacker needs access to an encryption oracle but not the key itself. This demo implements the attack against a 4-round SPN (Substitution-Permutation Network) toy cipher with an 8-bit block size, 4-bit S-boxes, a bit permutation layer, and a 16-bit master key. The attack performs last-round key recovery by partially decrypting ciphertext pairs under each candidate subkey and counting how many produce the expected output difference.
 
-Differential cryptanalysis is a method of cryptanalysis that exploits how small differences in plaintext propagate through a cipher. By carefully choosing pairs of inputs that differ by a specific amount (a **difference**), an attacker can observe patterns in the output differences and extract key information.
+## When to Use It
 
-This attack was the most important cryptanalytic advancement of the late 20th century, invalidating the assumption that cryptanalysis was purely academic and demonstrating that ciphers could have subtle weaknesses exploitable through statistical methods rather than brute force.
+- **Evaluating a new block cipher design** — Differential cryptanalysis is the first attack to test against any proposed cipher; if the S-box Difference Distribution Table has entries above 2/n, the cipher may be vulnerable with fewer pairs than brute-force search.
+- **Analyzing reduced-round variants** — When a cipher uses fewer rounds than recommended (as in this 4-round SPN), the differential probability through the full cipher stays high enough for practical key recovery with ~500 chosen-plaintext pairs.
+- **Teaching how modern ciphers defend against attacks** — The DDT visualization and trace in this demo show exactly why AES and Serpent choose S-boxes with low maximum differential probability and why round counts matter.
+- **Auditing S-box quality** — The Difference Distribution Table computed by `ddt.ts` reveals which input/output difference pairs have exploitable probability, directly measuring substitution-layer weakness.
+- **When NOT to use it** — Differential cryptanalysis does not apply when you lack chosen-plaintext access to an encryption oracle, or when the target cipher has provably low maximum differential probability across its full round count (e.g., AES-128 with 10 rounds).
 
-## Historical Significance
+## Live Demo
 
-- **1970s**: The NSA secretly discovered differential cryptanalysis and hardened DES to resist it.
-- **1990**: Biham & Shamir published their work, bringing the attack to public knowledge.
-- **1993**: Don Coppersmith confirmed that the NSA's DES S-box design was specifically hardened against differential attacks—validating the NSA's decades of classified research.
-- **1998**: Biham co-designed the Serpent cipher specifically to be immune to differential cryptanalysis.
+**[▶ Launch Demo](https://systemslibrarian.github.io/crypto-lab-biham-lens/)**
 
-## The Toy Cipher
+The demo lets you run a real differential attack in the browser. In the **Live Attack** tab, you choose two plaintext values (hex bytes), collect 100–1000 ciphertext pairs from the toy SPN cipher, and execute last-round key recovery — the attack ranks all 256 candidate subkeys by bias count and identifies the correct one. The **Differential Trace** tab visualizes how XOR differences propagate through S-box substitution and bit permutation round by round. The **S-box Analysis** tab displays the full 16×16 Difference Distribution Table with clickable cells showing count, probability, and exploitability for each differential.
 
-The cipher used in this demo is a simplified 4-round SPN:
+## What Can Go Wrong
 
-- **Block size**: 8 bits
-- **S-box**: 4-bit substitution (applied twice per byte, one per nibble)
-- **Permutation**: Bit-level diffusion across the 8-bit block
-- **Key schedule**: Simple subkey generation from a 16-bit master key
-- **Rounds**: 4 rounds
+- **Insufficient pair collection** — With fewer than ~500 chosen-plaintext pairs, the correct subkey's bias count may not separate from noise, causing the attack to return a wrong key candidate.
+- **Weak differential characteristic selection** — If the chosen input difference does not correspond to a high-probability path through the S-box layers, the output difference distribution flattens and no candidate key stands out; the attacker must select differentials guided by the DDT.
+- **Biased pair generation** — If the pseudorandom source generating plaintext pairs is biased or correlated, the observed differential counts become distorted, producing spurious high-ranking candidates or masking the correct key.
+- **Key schedule leakage across rounds** — In this toy cipher the round subkeys are derived from a single 16-bit master key with low entropy; recovering the last-round subkey may leak information about other subkeys, allowing full key recovery — a design flaw absent in real ciphers with strong key schedules.
+- **Assuming S-box uniformity without verification** — Deploying a cipher without computing its full DDT (as `ddt.ts` does) risks missing high-probability differentials; the NSA secretly verified DES S-box differential properties decades before the public discovery.
 
-The S-box is:
-```
-Input:  0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F
-Output: E  4  D  1  2  F  B  8  3  A  6  C  5  9  0  7
-```
+## Real-World Usage
 
-The permutation matrix maps bit positions [7,6,5,4,3,2,1,0] → [7,3,6,2,5,1,4,0].
-
-## How the Attack Works
-
-**Last-Round Key Recovery Technique** (Peel-Last-Round):
-
-1. **Collect chosen-plaintext pairs** with a fixed XOR difference Δp
-2. **Encrypt both** to get ciphertext pairs (c₁, c₂)
-3. **For each candidate key k ∈ [0, 255]**:
-   - Partially decrypt c₁ and c₂ by XORing with k
-   - Invert the S-box to undo the last round's substitution
-   - Check if the resulting difference matches the expected differential
-   - Count how many pairs match (this is the **bias**)
-4. **The candidate with highest bias** is the correct last-round key
-
-Attack complexity: ~500 chosen-plaintext pairs are usually sufficient to reliably identify the correct subkey among 256 candidates.
-
-## Features
-
-### Tab 1: Live Attack
-The interactive attack engine. You can:
-- Choose plaintext difference
-- Collect up to 2000 ciphertext pairs
-- Run the attack and watch the bias distribution evolve
-- See which candidate key is selected
-- Verify successful recovery against the known secret key
-
-### Tab 2: Differential Trace
-Visualization of how XOR differences propagate through rounds:
-- See how differences transform through S-boxes
-- Observe diffusion via permutation
-- Understand why differential cryptanalysis works
-
-### Tab 3: S-box Analysis
-Analysis of the S-box's differential properties:
-- Interactive S-box grid
-- Difference Distribution Table (DDT) — the core of differential cryptanalysis
-- Click any DDT cell to see probability, count, and whether it's exploitable
-- S-box strength assessment
-
-### Tab 4: Historical Impact
-- Timeline of the discovery and its implications
-- Attribution to Biham & Shamir
-- Connection to subsequent cipher designs
-
-### Tab 5: Why Serpent Survived
-- Comparison table: DES vs. AES vs. Serpent
-- Why Serpent's extreme conservatism guarantees safety
-- Portfolio connections to the broader crypto-compare story
-
-## Mathematical Prerequisites
-
-- **XOR difference**: Δx = x ⊕ x' (bitwise XOR of two inputs)
-- **Difference Propagation**: How S(x) ⊕ S(x') relates to x ⊕ x'
-- **Difference Distribution Table (DDT)**: For each input difference Δx and output difference Δy, count how many x ∈ [0,15] satisfy: S(x) ⊕ S(x ⊕ Δx) = Δy
-- **Differential Probability**: How often a particular difference propagates through a component
-- **Statistical Bias**: When the correct key is decrypted, the differences statistically match; wrong keys don't
-
-## Running Locally
-
-```bash
-# Install dependencies
-npm install
-
-# Start dev server
-npm run dev
-
-# Build for production
-npm run build
-```
-
-The app runs fully offline—no external dependencies at runtime.
-
-## References
-
-The original paper introducing differential cryptanalysis:
-
-> **Eli Biham and Adi Shamir**  
-> "Differential Cryptanalysis of DES-like Cryptosystems"  
-> *Journal of Cryptology*, vol. 4, no. 1, pp. 3–72, 1991
-
-## Attribution
-
-- **Technique**: Differential Cryptanalysis (Biham & Shamir, 1990)
-- **Serpent Cipher Design**: Eli Biham, Ross Anderson, Lars Knudsen (1998)
-- **This Implementation**: Part of the crypto-compare portfolio
-
-## Code Structure
-
-```
-src/
-├── crypto/
-│   ├── sbox.ts           # 4-bit S-box and inversion
-│   ├── permutation.ts    # Bit permutation for diffusion
-│   ├── spn.ts            # 4-round SPN cipher
-│   ├── ddt.ts            # Difference Distribution Table computation
-│   ├── characteristic.ts # Differential characteristic finding
-│   └── attack.ts         # Last-round key recovery attack
-├── __tests__/
-│   ├── spn.test.ts       # Cipher tests
-│   └── ddt.test.ts       # DDT tests
-├── main.ts               # UI application
-└── style.css             # Dark theme styling
-```
-
-## Implementation Notes
-
-- **Vanilla TypeScript**: No external crypto libraries. All SPN operations, S-box, permutation, and DDT computation are implemented from first principles.
-- **Real arithmetic**: The attack collects actual ciphertext pairs and performs real statistical analysis.
-- **Educational**: The code is optimized for clarity and understanding, not performance.
-- **Testable**: Round-trip tests verify correct encryption/decryption. DDT tests ensure proper differential analysis.
-
-## A Note on Security
-
-This toy cipher is **intentionally weak** for educational purposes. The 4 rounds, simple key schedule, and small block size make it vulnerable not just to differential attacks but to many other methods. Real ciphers use much larger block sizes (128+ bits), more rounds (10-32), and carefully designed S-boxes and linear layers.
+- **DES (1977)** — The NSA hardened DES's S-boxes against differential cryptanalysis in secret; Biham and Shamir's 1990 public discovery confirmed that DES with fewer than 16 rounds is breakable by this technique.
+- **AES / Rijndael (2001)** — The AES selection process required candidates to prove resistance to differential cryptanalysis; Rijndael's S-box has a maximum DDT entry of 4, ensuring no exploitable differential reaches through 10 rounds.
+- **Serpent (1998)** — Co-designed by Eli Biham himself, Serpent uses 32 rounds and S-boxes with maximum DDT entry 4 to guarantee immunity to differential cryptanalysis even under optimistic attacker models.
+- **PRESENT (2007)** — This lightweight block cipher for constrained IoT devices was specifically analyzed for differential resistance; its 4-bit S-box was chosen to minimize maximum differential probability across 31 rounds.
+- **NIST Lightweight Cryptography (2023)** — The ASCON AEAD winner underwent extensive differential cryptanalysis evaluation during standardization, applying the same DDT-based S-box analysis principles demonstrated in this demo.
 
 ---
 
