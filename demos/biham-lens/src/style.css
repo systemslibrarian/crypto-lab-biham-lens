@@ -1,7 +1,7 @@
-/* Dark theme for biham-lens cryptographic demo */
+/* biham-lens cryptographic demo - Theme support */
 
 :root {
-  /* Dark theme colors */
+  /* Dark theme colors (default) */
   --bg-primary: #0f0f1e;
   --bg-secondary: #1a1a2e;
   --bg-tertiary: #262642;
@@ -32,6 +32,23 @@
   
   font: 16px / 1.6 var(--sans);
   letter-spacing: 0.3px;
+}
+
+/* Light theme */
+[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f5fa;
+  --bg-tertiary: #ececf5;
+  
+  --text-primary: #1a1a2e;
+  --text-secondary: #4a4a5e;
+  --text-tertiary: #707080;
+  
+  --border: #d5d5e0;
+  --border-light: #e0e0eb;
+  
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  --shadow-sm: 0 4px 8px rgba(0, 0, 0, 0.08);
 }
 
 * {
@@ -88,6 +105,7 @@ body {
 }
 
 .header {
+  position: relative;
   background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
   border-bottom: 2px solid var(--border-light);
   padding: 3rem 1rem;
@@ -120,6 +138,37 @@ body {
   font-size: 0.9rem;
   color: var(--text-tertiary);
   font-style: italic;
+}
+
+/* Theme Toggle Button */
+.theme-toggle-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 50%;
+  border: 1px solid var(--border-light);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 1.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  z-index: 10;
+}
+
+.theme-toggle-btn:hover {
+  border-color: var(--accent-tertiary);
+  box-shadow: 0 0 15px rgba(0, 217, 255, 0.2);
+  transform: scale(1.05);
+}
+
+.theme-toggle-btn:focus-visible {
+  outline: 3px solid var(--accent-tertiary);
+  outline-offset: 2px;
 }
 
 /* Tab Navigation */
@@ -830,24 +879,18 @@ h4 {
 }
 
 /* Footer */
-.footer {
+.scripture-footer {
   background: var(--bg-secondary);
-  border-top: 2px solid var(--border);
+  border-top: 1px solid var(--border);
   padding: 2rem 1rem;
   text-align: center;
   margin-top: auto;
   color: var(--text-secondary);
 }
 
-.footer p {
-  margin-bottom: 0.5rem;
-  font-size: 0.95rem;
-}
-
-.footer-attribution {
-  font-size: 0.8rem;
-  color: var(--text-tertiary);
-  font-style: italic;
+.scripture-footer p {
+  margin-bottom: 0;
+  font-size: 0.85rem;
 }
 
 /* Responsive */

@@ -54,6 +54,13 @@ function initializeApp() {
 // ============================================================================
 
 function setupEventListeners() {
+  // Theme toggle
+  const themeToggle = document.getElementById('themeToggle') as HTMLButtonElement;
+  if (themeToggle) {
+    updateThemeToggleUI();
+    themeToggle.addEventListener('click', toggleTheme);
+  }
+
   // Tab buttons
   const tabButtons = document.querySelectorAll('.tab-button');
   tabButtons.forEach((button) => {
@@ -155,6 +162,36 @@ function switchTab(tabName: string) {
     selectedButton.classList.add('active');
     selectedButton.setAttribute('aria-selected', 'true');
     selectedButton.setAttribute('tabindex', '0');
+  }
+}
+
+// ============================================================================
+// Theme Toggle
+// ============================================================================
+
+function toggleTheme() {
+  const html = document.documentElement;
+  const currentTheme = html.getAttribute('data-theme') || 'dark';
+  const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+  
+  html.setAttribute('data-theme', newTheme);
+  localStorage.setItem('theme', newTheme);
+  updateThemeToggleUI();
+}
+
+function updateThemeToggleUI() {
+  const html = document.documentElement;
+  const currentTheme = html.getAttribute('data-theme') || 'dark';
+  const button = document.getElementById('themeToggle') as HTMLButtonElement;
+  
+  if (button) {
+    if (currentTheme === 'dark') {
+      button.textContent = '🌙';
+      button.setAttribute('aria-label', 'Switch to light mode');
+    } else {
+      button.textContent = '☀️';
+      button.setAttribute('aria-label', 'Switch to dark mode');
+    }
   }
 }
 

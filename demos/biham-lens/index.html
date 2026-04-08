@@ -4,6 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>biham-lens — Differential Cryptanalysis Demo</title>
+    <script>
+      (function () {
+        const saved = localStorage.getItem('theme');
+        document.documentElement.setAttribute('data-theme', saved ?? 'dark');
+      })();
+    </script>
     <link rel="stylesheet" href="/src/style.css" />
 </head>
 <body>
@@ -15,6 +21,7 @@
                 <p class="subtitle">Differential Cryptanalysis of a Toy SPN Cipher</p>
                 <p class="attribution">by Eli Biham &amp; Adi Shamir (1990)</p>
             </div>
+            <button class="theme-toggle-btn" id="themeToggle" aria-label="Switch to light mode">🌙</button>
         </header>
 
         <nav class="tabs" role="tablist" aria-label="Demo sections">
@@ -332,11 +339,8 @@
         </div>
         </main>
 
-        <footer class="footer">
-            <p>Differential cryptanalysis — The breakthrough that changed cryptography forever.</p>
-            <p class="footer-attribution">
-                Based on "Differential Cryptanalysis of DES-like Cryptosystems" by Eli Biham &amp; Adi Shamir (Journal of Cryptology, 1991)
-            </p>
+        <footer class="scripture-footer">
+            <p>So whether you eat or drink or whatever you do, do it all for the glory of God. — 1 Corinthians 10:31</p>
         </footer>
     </div>
 
