@@ -46,21 +46,23 @@ test('Permutation: permute and permuteInverse are inverses', () => {
 });
 
 test('Permutation: known bit positions', () => {
-  // Input bits [7,6,5,4,3,2,1,0] go to positions [7,3,6,2,5,1,4,0]
-  // So bit 0 in input goes to position 7 in output
-  const input = 0b00000001; // Only bit 0 set
+  // PERMUTATION[i] = j means input bit i goes to output position j
+  // PERMUTATION = [7, 3, 6, 2, 5, 1, 4, 0]
+
+  // Bit 0 → position 7
+  const input = 0b00000001;
   const output = permute(input);
   assert.equal(output, 0b10000000, 'Bit 0 should go to position 7');
 
-  // Bit 7 in input goes to position 7 in output
-  const input2 = 0b10000000; // Only bit 7 set
+  // Bit 7 → position 0
+  const input2 = 0b10000000;
   const output2 = permute(input2);
-  assert.equal(output2, 0b10000000, 'Bit 7 should stay at position 7');
+  assert.equal(output2, 0b00000001, 'Bit 7 should go to position 0');
 
-  // Bit 1 in input goes to position 1 in output
-  const input3 = 0b00000010; // Only bit 1 set
+  // Bit 1 → position 3
+  const input3 = 0b00000010;
   const output3 = permute(input3);
-  assert.equal(output3, 0b00000010, 'Bit 1 should stay at position 1');
+  assert.equal(output3, 0b00001000, 'Bit 1 should go to position 3');
 });
 
 test('SPN cipher: round-trip encryption/decryption', () => {
