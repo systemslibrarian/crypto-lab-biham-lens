@@ -10,8 +10,9 @@
  */
 
 import { invertBothNibbles } from './sbox.js';
-import { encrypt } from './spn.js';
+import { encrypt, encryptRounds } from './spn.js';
 import type { SPNKey } from './spn.js';
+import { nextInt } from './rng.js';
 
 /**
  * Result of attacking with a candidate key
@@ -49,8 +50,8 @@ export function collectPairs(
   const pairs: Array<{ c1: number; c2: number }> = [];
 
   for (let i = 0; i < count; i++) {
-    // Choose random plaintext
-    const p1 = Math.floor(Math.random() * 256);
+    // Choose random plaintext from the seeded stream so runs are reproducible.
+    const p1 = nextInt(256);
     const p2 = (p1 ^ inputDiff) & 0xFF;
 
     // Encrypt both
@@ -171,7 +172,7 @@ export function performAttack(
   const results = attackLastRound(pairs, expectedOutputDiff);
 
   // Analyze
-  const correctKeyRank = getKeyRank(results, key.subkeys[3]); // Last round key
+  const correctKeyRank = getKeyRank(results, key.subkeys[4]); // Final mixing key
 
   return {
     totalPairs: pairCount,
@@ -180,6 +181,52 @@ export function performAttack(
     correctKeyRank,
     correctKeyBias: results[0].biasCount, // Get bias of best candidate
   };
+}
+
+/**
+ * Empirically derive the most likely difference observed *just before*
+ * the last S-box, given a chosen plaintext difference.
+ *
+ * This is what the textbook calls a 3-round differential characteristic
+ * for the 4-round cipher: we run many encryption pairs through the first
+ * 3 rounds (XOR-K, S-box, permute), observe how often each difference
+ * appears, and return the peak.
+ *
+ * Mathematically, this peak is what makes the attack work — at the
+ * correct last-round key guess, the partial decryption will reveal this
+ * differential more often than chance; at wrong guesses, the distribution
+ * is roughly uniform.
+ */
+export interface CharacteristicSample {
+  outputDiff: number;
+  count: number;
+  probability: number;
+}
+
+export function deriveCharacteristic(
+  key: SPNKey,
+  inputDiff: number,
+  samples: number = 4000,
+): CharacteristicSample[] {
+  const histogram = new Array(256).fill(0);
+
+  for (let i = 0; i < samples; i++) {
+    const p1 = nextInt(256);
+    const p2 = (p1 ^ inputDiff) & 0xFF;
+    // State after 3 rounds = state going into round 4's XOR-K + S-box.
+    // The differential we exploit is on this intermediate value.
+    const s1 = encryptRounds(p1, key, 3);
+    const s2 = encryptRounds(p2, key, 3);
+    histogram[s1 ^ s2]++;
+  }
+
+  const ranked: CharacteristicSample[] = histogram.map((count, outputDiff) => ({
+    outputDiff,
+    count,
+    probability: count / samples,
+  }));
+  ranked.sort((a, b) => b.count - a.count);
+  return ranked;
 }
 
 /**

@@ -122,11 +122,11 @@ test('SPN cipher: encryptRounds stops after N rounds', () => {
   assert.equal(fullEncrypt, round4, 'Full encryption should equal 4 rounds');
 });
 
-test('SPN cipher: key schedule generates 4 subkeys', () => {
+test('SPN cipher: key schedule generates 5 subkeys', () => {
   const key = generateKey(0xABCD);
-  assert.equal(key.subkeys.length, 4, 'Should have 4 subkeys');
+  assert.equal(key.subkeys.length, 5, 'Should have 5 subkeys');
 
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 5; i++) {
     const subkey = key.subkeys[i];
     assert.ok(subkey >= 0 && subkey <= 0xFF, `Subkey ${i} should be 8-bit value`);
   }
@@ -137,7 +137,7 @@ test('SPN cipher: different master keys produce different subkeys', () => {
   const key2 = generateKey(0x5678);
 
   let allSame = true;
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 5; i++) {
     if (key1.subkeys[i] !== key2.subkeys[i]) {
       allSame = false;
       break;

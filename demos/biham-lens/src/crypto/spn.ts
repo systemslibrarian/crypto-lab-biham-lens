@@ -30,10 +30,10 @@ export function generateKey(masterKey: number): SPNKey {
   const subkeys: number[] = [];
   let key = masterKey & 0xFFFF;
 
-  // Generate 4 subkeys by rotating and XORing
-  for (let i = 0; i < 4; i++) {
-    // Extract 8 bits from the rotated key
-    subkeys.push((key >> (i * 4)) & 0xFF);
+  // Generate 5 subkeys by rotating
+  for (let i = 0; i < 5; i++) {
+    // Extract lower 8 bits
+    subkeys.push(key & 0xFF);
     // Rotate key left by 4 bits
     key = ((key << 4) | (key >> 12)) & 0xFFFF;
   }
@@ -101,7 +101,10 @@ export function encrypt(plaintext: number, key: SPNKey): number {
     state = roundEncrypt(state, key.subkeys[round], isLastRound);
   }
 
-  return state & 0xFF;
+  // Final key mixing
+  state = (state ^ key.subkeys[4]) & 0xFF;
+
+  return state;
 }
 
 /**
@@ -113,13 +116,107 @@ export function encrypt(plaintext: number, key: SPNKey): number {
 export function decrypt(ciphertext: number, key: SPNKey): number {
   let state = ciphertext & 0xFF;
 
+  // Undo final key mixing
+  state = (state ^ key.subkeys[4]) & 0xFF;
+
   // Execute 4 rounds in reverse order
   for (let round = 3; round >= 0; round--) {
     const isFirstRound = round === 3;
     state = roundDecrypt(state, key.subkeys[round], isFirstRound);
   }
 
-  return state & 0xFF;
+  return state;
+}
+
+/**
+ * Per-stage trace for the Differential Trace tab.
+ *
+ * Each entry is one observable step in the cipher pipeline, with the two
+ * concrete states *and* their XOR difference. The whole point is to make
+ * visible that the XOR-K stages leave the difference unchanged — that is
+ * the foundation of differential cryptanalysis.
+ */
+export type TraceStageKind = 'input' | 'xor-key' | 'sbox' | 'permute';
+
+export interface TraceStage {
+  kind: TraceStageKind;
+  label: string;
+  round: number;          // 1..4 for round-internal stages, 0 for input
+  state1: number;
+  state2: number;
+  diff: number;
+}
+
+export function traceEncryption(p1: number, p2: number, key: SPNKey): TraceStage[] {
+  const stages: TraceStage[] = [];
+  let s1 = p1 & 0xFF;
+  let s2 = p2 & 0xFF;
+
+  stages.push({
+    kind: 'input',
+    label: 'Plaintext',
+    round: 0,
+    state1: s1,
+    state2: s2,
+    diff: (s1 ^ s2) & 0xFF,
+  });
+
+  for (let round = 0; round < 4; round++) {
+    const subkey = key.subkeys[round];
+    const isLastRound = round === 3;
+
+    // Stage 1: XOR with subkey — diff unchanged.
+    s1 = (s1 ^ subkey) & 0xFF;
+    s2 = (s2 ^ subkey) & 0xFF;
+    stages.push({
+      kind: 'xor-key',
+      label: `Round ${round + 1}: XOR K${round + 1}`,
+      round: round + 1,
+      state1: s1,
+      state2: s2,
+      diff: (s1 ^ s2) & 0xFF,
+    });
+
+    // Stage 2: S-box — diff may change.
+    s1 = applyBothNibbles(s1);
+    s2 = applyBothNibbles(s2);
+    stages.push({
+      kind: 'sbox',
+      label: `Round ${round + 1}: S-box`,
+      round: round + 1,
+      state1: s1,
+      state2: s2,
+      diff: (s1 ^ s2) & 0xFF,
+    });
+
+    // Stage 3: permutation (skipped in last round).
+    if (!isLastRound) {
+      s1 = permute(s1);
+      s2 = permute(s2);
+      stages.push({
+        kind: 'permute',
+        label: `Round ${round + 1}: Permute`,
+        round: round + 1,
+        state1: s1,
+        state2: s2,
+        diff: (s1 ^ s2) & 0xFF,
+      });
+    }
+  }
+
+  // Final Key XOR
+  s1 = (s1 ^ key.subkeys[4]) & 0xFF;
+  s2 = (s2 ^ key.subkeys[4]) & 0xFF;
+  stages.push({
+    kind: 'xor-key',
+    label: `Round 5: Final Key Mixing`,
+    round: 5,
+    state1: s1,
+    state2: s2,
+    diff: (s1 ^ s2) & 0xFF,
+  });
+
+  return stages;
 }
 
 /**
@@ -138,8 +235,12 @@ export function encryptRounds(plaintext: number, key: SPNKey, rounds: number): n
   let state = plaintext & 0xFF;
 
   for (let round = 0; round < rounds; round++) {
-    const isLastRound = round === rounds - 1;
+    const isLastRound = round === 3;
     state = roundEncrypt(state, key.subkeys[round], isLastRound);
+  }
+
+  if (rounds === 4) {
+    state = (state ^ key.subkeys[4]) & 0xFF;
   }
 
   return state & 0xFF;
@@ -159,6 +260,10 @@ export function decryptRounds(ciphertext: number, key: SPNKey, rounds: number): 
   }
 
   let state = ciphertext & 0xFF;
+
+  if (rounds === 4) {
+    state = (state ^ key.subkeys[4]) & 0xFF;
+  }
 
   for (let round = 4 - 1; round >= 4 - rounds; round--) {
     const isFirstRound = round === 3;

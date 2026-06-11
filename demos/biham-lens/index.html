@@ -38,9 +38,42 @@
             <div class="tab-inner">
                 <h2>Live Differential Attack</h2>
                 <p class="tab-explanation">
-                    This tab demonstrates a real chosen-plaintext differential attack on the 4-round toy SPN cipher.
-                    We exploit a high-probability differential to recover the last round subkey.
+                    A real chosen-plaintext differential attack on the 4-round toy SPN cipher: we exploit a
+                    high-probability differential to recover the last round subkey.
                 </p>
+
+                <aside class="insight-callout" aria-label="Core insight">
+                    <h4>Why XOR differences? The core insight</h4>
+                    <p>
+                        For any two plaintexts P₁, P₂ and any round key K:
+                        <span class="mono">(P₁ ⊕ K) ⊕ (P₂ ⊕ K) = P₁ ⊕ P₂</span>
+                    </p>
+                    <p>
+                        The key XOR <em>cannot change the difference</em>. Permutation just relocates the
+                        active bits. Only the S-box can change the difference — and it does so with biases
+                        you can measure in the DDT. That is why differential cryptanalysis works.
+                    </p>
+                </aside>
+
+                <div class="setup-row">
+                    <div class="setup-card">
+                        <h4>Cipher setup</h4>
+                        <p>Active S-box: <span id="activeSboxLabel" class="mono">Weak (toy)</span>
+                            <a href="#sbox" id="gotoSboxLink" class="inline-link">change →</a></p>
+                        <p>Master key K: <span class="mono" id="masterKeyDisplay">0x5A69</span></p>
+                        <p>Last round subkey K₄ <em>(hidden from attacker):</em> <span class="mono" id="hiddenK4">••</span>
+                            <button id="revealK4" class="link-btn" type="button">reveal</button></p>
+                    </div>
+                    <div class="setup-card">
+                        <h4>Reproducibility</h4>
+                        <div class="form-group inline">
+                            <label for="seedInput">PRNG seed (hex):</label>
+                            <input type="text" id="seedInput" value="12345678" maxlength="8" class="hex-input">
+                            <button id="applySeed" class="btn btn-secondary tight">Apply</button>
+                        </div>
+                        <p class="muted">Same seed → identical pair stream → reproducible bias chart.</p>
+                    </div>
+                </div>
 
                 <div class="attack-container">
                     <div class="input-section">
@@ -54,8 +87,24 @@
                             <input type="text" id="p2" value="43" maxlength="2" class="hex-input">
                         </div>
                         <div class="form-group">
-                            <label>Difference: <span id="plainDiff" class="mono">0x01</span></label>
+                            <label>Δ Plaintext: <span id="plainDiff" class="mono">0x01</span></label>
                         </div>
+                    </div>
+
+                    <div class="input-section">
+                        <h3>Step 1½: Target Differential</h3>
+                        <p class="muted">
+                            We attack the last round by guessing K₄, partially decrypting, and counting
+                            how many pairs hit the difference we expect <em>just before</em> the last S-box.
+                        </p>
+                        <div class="form-group">
+                            <label for="outDiff">Expected Δ before last S-box (hex):</label>
+                            <input type="text" id="outDiff" value="0B" maxlength="2" class="hex-input">
+                        </div>
+                        <button id="deriveDiff" class="btn btn-secondary">Derive empirically from cipher</button>
+                        <p id="characteristicStatus" class="status" aria-live="polite">
+                            Click <em>derive</em> to sample the cipher and find the peak 3-round differential.
+                        </p>
                     </div>
 
                     <div class="control-section">
@@ -70,6 +119,7 @@
                     <div class="attack-section">
                         <h3>Step 3: Run Attack</h3>
                         <button id="runAttack" class="btn btn-danger">Run Attack on Last Round</button>
+                        <button id="runSweep" class="btn btn-secondary">Sweep pair counts</button>
                         <p id="attackStatus" class="status" aria-live="polite">Ready to analyze pairs.</p>
                     </div>
                 </div>
@@ -89,6 +139,10 @@
                             <div class="result-label">Bias of Top Candidate</div>
                             <div class="result-value mono" id="topBias">—</div>
                         </div>
+                        <div class="result-card">
+                            <div class="result-label">Margin over runner-up</div>
+                            <div class="result-value mono" id="biasMargin">—</div>
+                        </div>
                     </div>
 
                     <h4>Bias Distribution (Top 10 Candidates)</h4>
@@ -103,6 +157,56 @@
                         <p><strong>Actual Key K₄:</strong> <span class="mono" id="actualKey">0x00</span></p>
                         <p><strong>Recovered:</strong> <span class="mono" id="recoveredKeyText">0x00</span></p>
                     </div>
+                    <div id="failureMessage" style="display: none;" class="failure-card">
+                        <div class="failure-icon">✗</div>
+                        <h4>The bias didn't separate from noise</h4>
+                        <p id="failureExplain"></p>
+                    </div>
+
+                    <h4>Learning Curve: Pairs Needed to Find the Key</h4>
+                    <p class="muted">Each point: re-run the attack at N pairs and record the rank of the correct K₄. Rank 1 means the attack <em>worked</em>.</p>
+                    <figure role="img" aria-label="Line chart of correct-key rank versus number of pairs">
+                        <canvas id="sweepChart" width="600" height="240"></canvas>
+                    </figure>
+                </div>
+
+                <div class="complexity-panel" id="complexityPanel">
+                    <h3>Differential vs. Brute Force</h3>
+                    <p class="muted">
+                        The toy cipher is small enough that brute force is competitive. The win scales:
+                        on real ciphers a differential characteristic can save you tens of bits of search.
+                    </p>
+                    <table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Cipher</th>
+                                <th scope="col">Brute force (key search)</th>
+                                <th scope="col">Differential cost</th>
+                                <th scope="col">Reference</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Toy SPN (16-bit key, this demo)</td>
+                                <td class="mono" id="bfToy">2¹⁶ ≈ 65 536</td>
+                                <td class="mono" id="diffToy">—</td>
+                                <td>K₄ alone is 8 bits</td>
+                            </tr>
+                            <tr>
+                                <td>DES (56-bit)</td>
+                                <td class="mono">2⁵⁶ ≈ 7.2 × 10¹⁶</td>
+                                <td class="mono strong">2⁴⁷ ≈ 1.4 × 10¹⁴</td>
+                                <td>Biham &amp; Shamir 1991</td>
+                            </tr>
+                            <tr>
+                                <td>AES-128</td>
+                                <td class="mono">2¹²⁸</td>
+                                <td class="mono strong">no usable characteristic</td>
+                                <td>Daemen &amp; Rijmen 2002</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <p id="opCounter" class="muted">Operations performed by the most recent attack: <span class="mono" id="opCount">0</span></p>
                 </div>
             </div>
         </div>
@@ -110,60 +214,46 @@
         <!-- TAB 2: Differential Trace -->
         <div id="trace" class="tab-content" role="tabpanel" aria-labelledby="tab-trace" tabindex="0">
             <div class="tab-inner">
-                <h2>Differential Trace Visualization</h2>
+                <h2>Differential Trace</h2>
                 <p class="tab-explanation">
-                    Watch how XOR differences propagate through the rounds of the cipher via S-box substitution and bit permutation.
+                    Two plaintexts P₁ and P₂ flow through every sub-stage of the cipher. The colored bar on
+                    each row is the XOR difference at that point. Watch the difference <em>not</em> change
+                    on XOR-K rows, get scrambled by S-box rows, and relocate on permute rows.
                 </p>
 
-                <div class="trace-container">
-                    <div class="trace-controls">
-                        <button id="traceNext" class="btn btn-primary">Trace Next Stage</button>
-                        <button id="traceReset" class="btn btn-secondary">Reset</button>
-                        <p id="traceStage" class="status" aria-live="polite">Input difference</p>
-                    </div>
+                <aside class="insight-callout tight" aria-label="Reading the trace">
+                    <p>
+                        <strong>XOR-K rows preserve the difference</strong> exactly — that's the central
+                        invariant. <strong>S-box rows</strong> are the only place where the difference can
+                        change, and the DDT tells you how likely each transition is.
+                        <strong>Permute rows</strong> shuffle the active bits without changing how many.
+                    </p>
+                </aside>
 
-                    <div class="trace-stages">
-                        <div class="stage-display">
-                            <h4>Input Difference</h4>
-                            <div class="diff-display">
-                                <div class="byte-bits" id="stageBits0"></div>
-                                <div class="diff-info">
-                                    <span>Value: <span class="mono" id="stageValue0">0x00</span></span>
-                                    <span>Active bits: <span id="stageActive0">0</span></span>
-                                    <span>Probability: <span id="stageProbability0">1.00</span></span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="stage-arrow">→</div>
-                        <div class="stage-display">
-                            <h4>After S-box (Round 1)</h4>
-                            <div class="diff-display">
-                                <div class="byte-bits" id="stageBits1"></div>
-                                <div class="diff-info">
-                                    <span>Value: <span class="mono" id="stageValue1">?</span></span>
-                                    <span>Active bits: <span id="stageActive1">—</span></span>
-                                    <span>Probability: <span id="stageProbability1">—</span></span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="stage-arrow">→</div>
-                        <div class="stage-display">
-                            <h4>After Permutation (Round 1)</h4>
-                            <div class="diff-display">
-                                <div class="byte-bits" id="stageBits2"></div>
-                                <div class="diff-info">
-                                    <span>Value: <span class="mono" id="stageValue2">?</span></span>
-                                    <span>Active bits: <span id="stageActive2">—</span></span>
-                                    <span>Probability: <span id="stageProbability2">—</span></span>
-                                </div>
-                            </div>
-                        </div>
+                <div class="trace-controls">
+                    <div class="form-group inline">
+                        <label for="traceP1">P₁:</label>
+                        <input type="text" id="traceP1" maxlength="2" class="hex-input">
+                        <label for="traceP2">P₂:</label>
+                        <input type="text" id="traceP2" maxlength="2" class="hex-input">
+                        <span class="muted">(shares with attack tab)</span>
                     </div>
+                    <button id="traceStep" class="btn btn-primary">Step</button>
+                    <button id="traceShowAll" class="btn btn-secondary">Show all</button>
+                    <button id="traceReset" class="btn btn-secondary">Reset</button>
+                    <p id="traceStatus" class="status" aria-live="polite">Stage 0 of 11.</p>
+                </div>
 
-                    <div class="stage-legend">
-                        <div class="legend-item"><span class="bit active"></span> Active bit (different)</div>
-                        <div class="legend-item"><span class="bit inactive"></span> Inactive bit (same)</div>
-                    </div>
+                <div class="trace-pipeline" id="tracePipeline" role="list" aria-label="Differential pipeline">
+                    <!-- populated by JS -->
+                </div>
+
+                <div class="stage-legend">
+                    <div class="legend-item"><span class="bit active"></span> active bit</div>
+                    <div class="legend-item"><span class="bit inactive"></span> inactive bit</div>
+                    <div class="legend-item"><span class="stage-tag xor-key">XOR-K</span> preserves Δ</div>
+                    <div class="legend-item"><span class="stage-tag sbox">S-box</span> can change Δ</div>
+                    <div class="legend-item"><span class="stage-tag permute">Permute</span> relocates Δ</div>
                 </div>
             </div>
         </div>
@@ -173,8 +263,20 @@
             <div class="tab-inner">
                 <h2>S-box Analysis</h2>
                 <p class="tab-explanation">
-                    The S-box is the only non-linear component of the cipher. Its differential properties determine the strength of the cipher against differential attacks.
+                    The S-box is the only non-linear component of the cipher. Its differential properties
+                    determine whether the cipher falls to a differential attack — swap it below to feel the
+                    difference.
                 </p>
+
+                <div class="sbox-swap" role="radiogroup" aria-label="Active S-box">
+                    <button id="useWeakSbox" class="btn-toggle active" role="radio" aria-checked="true">
+                        Weak (toy textbook) — max DDT 8
+                    </button>
+                    <button id="useStrongSbox" class="btn-toggle" role="radio" aria-checked="false">
+                        Strong (PRESENT cipher) — max DDT 4
+                    </button>
+                    <p class="muted">Swapping resets the cipher, clears collected pairs, and recomputes the DDT.</p>
+                </div>
 
                 <div class="sbox-analysis">
                     <div class="sbox-grid-container">
@@ -186,7 +288,7 @@
                     <div class="ddt-container">
                         <h3>Difference Distribution Table (DDT)</h3>
                         <p class="ddt-explanation">
-                            Rows: Input Difference • Columns: Output Difference • Colors show count (0-255 pairs)
+                            Rows: Input Difference • Columns: Output Difference • Counts out of 16 input pairs
                         </p>
                         <div class="ddt-grid" id="ddtGrid" role="grid" aria-label="Difference Distribution Table"></div>
                         <div id="ddtClickInfo" aria-live="polite" style="display: none; margin-top: 1rem;">
@@ -194,6 +296,9 @@
                             <p><strong>Count:</strong> <span id="ddtCount">0</span> out of 16 input pairs</p>
                             <p><strong>Probability:</strong> <span id="ddtProb">0%</span></p>
                             <p id="ddtExploitable"></p>
+                            <button id="useInAttack" class="btn btn-primary" style="display: none;">
+                                Use this differential in the attack →
+                            </button>
                         </div>
                     </div>
 

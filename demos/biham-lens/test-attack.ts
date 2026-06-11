@@ -1,0 +1,1 @@
+import { generateKey } from './src/crypto/spn.js'; import { performAttack, deriveCharacteristic } from './src/crypto/attack.js'; const key = generateKey(0x1234); const chars = deriveCharacteristic(key, 0x0B, 4000); console.log('Best diff:', chars[0].outputDiff); const stats = performAttack(key, 0x0B, chars[0].outputDiff, 4000); console.log('Rank:', stats.correctKeyRank);

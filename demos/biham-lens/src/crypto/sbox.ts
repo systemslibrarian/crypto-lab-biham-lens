@@ -1,19 +1,39 @@
 /**
  * S-box implementation for differential cryptanalysis demo
- * 
+ *
  * Based on "Differential Cryptanalysis of DES-like Cryptosystems"
  * by Eli Biham and Adi Shamir, Journal of Cryptology, 1991
- * 
- * This module implements a 4-bit S-box for the toy SPN cipher.
- * The S-box is the source of non-linearity in the cipher.
+ *
+ * Two named S-boxes are provided so users can FEEL why S-box choice matters:
+ *   - 'weak'   : the toy S-box used in textbook examples, max DDT = 8
+ *   - 'strong' : the PRESENT S-box (Bogdanov et al. 2007), max DDT = 4
+ *
+ * Swapping at runtime updates SBOX/SBOX_INV consulted by every other module.
  */
 
-// 4-bit S-box: input (0-15) → output (0-15)
-// Input:  0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F
-// Output: E  4  D  1  2  F  B  8  3  A  6  C  5  9  0  7
-const SBOX: number[] = [0xE, 0x4, 0xD, 0x1, 0x2, 0xF, 0xB, 0x8, 0x3, 0xA, 0x6, 0xC, 0x5, 0x9, 0x0, 0x7];
+// Toy textbook S-box (Heys' tutorial / Stinson's "Cryptography" 3rd ed).
+// Max DDT entry = 8 — highly exploitable.
+const SBOX_WEAK: ReadonlyArray<number> = [
+  0xE, 0x4, 0xD, 0x1, 0x2, 0xF, 0xB, 0x8, 0x3, 0xA, 0x6, 0xC, 0x5, 0x9, 0x0, 0x7,
+];
 
-// Compute inverse S-box
+// PRESENT cipher S-box. Max DDT entry = 4 — the smallest possible for a
+// 4-bit permutation, which is why PRESENT chose it.
+const SBOX_STRONG: ReadonlyArray<number> = [
+  0xC, 0x5, 0x6, 0xB, 0x9, 0x0, 0xA, 0xD, 0x3, 0xE, 0xF, 0x8, 0x4, 0x7, 0x1, 0x2,
+];
+
+export type SboxName = 'weak' | 'strong';
+
+const SBOXES: Record<SboxName, ReadonlyArray<number>> = {
+  weak: SBOX_WEAK,
+  strong: SBOX_STRONG,
+};
+
+let activeName: SboxName = 'weak';
+let SBOX: number[] = [...SBOX_WEAK];
+let SBOX_INV: number[] = computeSboxInverse(SBOX);
+
 function computeSboxInverse(sbox: number[]): number[] {
   const inverse: number[] = new Array(16).fill(0);
   for (let i = 0; i < 16; i++) {
@@ -22,13 +42,18 @@ function computeSboxInverse(sbox: number[]): number[] {
   return inverse;
 }
 
-const SBOX_INV: number[] = computeSboxInverse(SBOX);
+/** Switch the cipher's active S-box. Returns the new active name. */
+export function setSbox(name: SboxName): SboxName {
+  activeName = name;
+  SBOX = [...SBOXES[name]];
+  SBOX_INV = computeSboxInverse(SBOX);
+  return activeName;
+}
 
-/**
- * Apply S-box to a single 4-bit nibble
- * @param nibble Value from 0-15
- * @returns S-box output (0-15)
- */
+export function getActiveSboxName(): SboxName {
+  return activeName;
+}
+
 export function sboxApply(nibble: number): number {
   if (nibble < 0 || nibble > 15) {
     throw new Error(`Invalid nibble: ${nibble}. Must be in range 0-15.`);
@@ -36,11 +61,6 @@ export function sboxApply(nibble: number): number {
   return SBOX[nibble];
 }
 
-/**
- * Apply inverse S-box to a single 4-bit nibble
- * @param nibble Value from 0-15
- * @returns Inverse S-box output (0-15)
- */
 export function sboxInvert(nibble: number): number {
   if (nibble < 0 || nibble > 15) {
     throw new Error(`Invalid nibble: ${nibble}. Must be in range 0-15.`);
@@ -48,43 +68,22 @@ export function sboxInvert(nibble: number): number {
   return SBOX_INV[nibble];
 }
 
-/**
- * Apply S-box to both 4-bit nibbles of an 8-bit byte
- * High nibble (bits 4-7) and low nibble (bits 0-3)
- * @param byte 8-bit value
- * @returns Result with S-box applied to both nibbles
- */
 export function applyBothNibbles(byte: number): number {
   const highNibble = (byte >> 4) & 0xF;
   const lowNibble = byte & 0xF;
-  const sboxHigh = sboxApply(highNibble);
-  const sboxLow = sboxApply(lowNibble);
-  return (sboxHigh << 4) | sboxLow;
+  return (SBOX[highNibble] << 4) | SBOX[lowNibble];
 }
 
-/**
- * Apply inverse S-box to both 4-bit nibbles of an 8-bit byte
- * @param byte 8-bit value
- * @returns Result with inverse S-box applied to both nibbles
- */
 export function invertBothNibbles(byte: number): number {
   const highNibble = (byte >> 4) & 0xF;
   const lowNibble = byte & 0xF;
-  const invHigh = sboxInvert(highNibble);
-  const invLow = sboxInvert(lowNibble);
-  return (invHigh << 4) | invLow;
+  return (SBOX_INV[highNibble] << 4) | SBOX_INV[lowNibble];
 }
 
-/**
- * Get the S-box lookup table (read-only)
- */
 export function getSbox(): ReadonlyArray<number> {
   return SBOX;
 }
 
-/**
- * Get the inverse S-box lookup table (read-only)
- */
 export function getSboxInverse(): ReadonlyArray<number> {
   return SBOX_INV;
 }

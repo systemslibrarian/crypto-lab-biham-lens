@@ -1,31 +1,39 @@
 /**
  * Main UI application for biham-lens
- * 
+ *
  * Based on "Differential Cryptanalysis of DES-like Cryptosystems"
  * by Eli Biham and Adi Shamir, Journal of Cryptology, 1991
  */
 
-import { generateKey } from './crypto/spn.js';
-import type { SPNKey } from './crypto/spn.js';
+import { generateKey, traceEncryption } from './crypto/spn.js';
+import type { SPNKey, TraceStage } from './crypto/spn.js';
 import { computeDDT, verifyDDTProperties } from './crypto/ddt.js';
-import { getSbox } from './crypto/sbox.js';
-import { collectPairs, attackLastRound, identifyCorrectKey, getKeyRank } from './crypto/attack.js';
+import { getSbox, setSbox, getActiveSboxName } from './crypto/sbox.js';
+import type { SboxName } from './crypto/sbox.js';
+import {
+  collectPairs,
+  attackLastRound,
+  identifyCorrectKey,
+  getKeyRank,
+  deriveCharacteristic,
+} from './crypto/attack.js';
 import type { AttackResult } from './crypto/attack.js';
+import { seed as seedRng, getSeed as getRngSeed } from './crypto/rng.js';
 
 // ============================================================================
 // Application State
 // ============================================================================
 
 interface AppState {
-  // Cipher
   masterKey: number;
   spnKey: SPNKey;
-  
-  // Attack
   collectedPairs: Array<{ c1: number; c2: number }>;
   lastAttackResults: AttackResult[] | null;
   selectedInputDiff: number;
   selectedOutputDiff: number;
+  lastOpCount: number;
+  traceStages: TraceStage[];
+  traceVisibleCount: number;
 }
 
 const state: AppState = {
@@ -35,6 +43,9 @@ const state: AppState = {
   lastAttackResults: null,
   selectedInputDiff: 0x01,
   selectedOutputDiff: 0x0B,
+  lastOpCount: 0,
+  traceStages: [],
+  traceVisibleCount: 1,
 };
 
 // ============================================================================
@@ -42,11 +53,28 @@ const state: AppState = {
 // ============================================================================
 
 function initializeApp() {
+  // Seed RNG from the input's default value so the first attack is reproducible.
+  const seedInput = byId<HTMLInputElement>('seedInput');
+  seedRng(parseInt(seedInput.value, 16) || 0x12345678);
+
   state.spnKey = generateKey(state.masterKey);
   setupEventListeners();
+  syncSboxToggleUI();
   renderDDT();
   renderSBox();
+  updateActiveSboxLabel();
+  updateMasterKeyDisplay();
+  updateHiddenK4();
   updatePairStatus();
+  rebuildTrace();
+  renderTracePipeline();
+  showTimelineContent(0);
+}
+
+function byId<T extends HTMLElement>(id: string): T {
+  const el = document.getElementById(id);
+  if (!el) throw new Error(`Missing element #${id}`);
+  return el as T;
 }
 
 // ============================================================================
@@ -54,14 +82,13 @@ function initializeApp() {
 // ============================================================================
 
 function setupEventListeners() {
-  // Theme toggle
-  const themeToggle = document.getElementById('themeToggle') as HTMLButtonElement;
+  const themeToggle = document.getElementById('themeToggle') as HTMLButtonElement | null;
   if (themeToggle) {
     updateThemeToggleUI();
     themeToggle.addEventListener('click', toggleTheme);
   }
 
-  // Tab buttons
+  // Tabs (click + keyboard nav, WAI-ARIA pattern).
   const tabButtons = document.querySelectorAll('.tab-button');
   tabButtons.forEach((button) => {
     button.addEventListener('click', () => {
@@ -70,7 +97,6 @@ function setupEventListeners() {
     });
   });
 
-  // Keyboard navigation for tabs (WAI-ARIA tabs pattern)
   const tabNav = document.querySelector('[role="tablist"]');
   if (tabNav) {
     tabNav.addEventListener('keydown', (e: Event) => {
@@ -101,62 +127,80 @@ function setupEventListeners() {
     });
   }
 
-  // Attack tab controls
-  const p1Input = document.getElementById('p1') as HTMLInputElement;
-  const p2Input = document.getElementById('p2') as HTMLInputElement;
-  const add100 = document.getElementById('add100') as HTMLButtonElement;
-  const add500 = document.getElementById('add500') as HTMLButtonElement;
-  const add1000 = document.getElementById('add1000') as HTMLButtonElement;
-  const clearPairs = document.getElementById('clearPairs') as HTMLButtonElement;
-  const runAttack = document.getElementById('runAttack') as HTMLButtonElement;
+  // Attack tab.
+  const p1Input = byId<HTMLInputElement>('p1');
+  const p2Input = byId<HTMLInputElement>('p2');
+  const outDiffInput = byId<HTMLInputElement>('outDiff');
 
-  p1Input.addEventListener('change', updatePlaintextDisplay);
-  p2Input.addEventListener('change', updatePlaintextDisplay);
-  add100.addEventListener('click', () => collectAndAddPairs(100));
-  add500.addEventListener('click', () => collectAndAddPairs(500));
-  add1000.addEventListener('click', () => collectAndAddPairs(1000));
-  clearPairs.addEventListener('click', clearAllPairs);
-  runAttack.addEventListener('click', runAttackOnCollectedPairs);
+  p1Input.addEventListener('input', onPlaintextChange);
+  p2Input.addEventListener('input', onPlaintextChange);
+  outDiffInput.addEventListener('input', onOutDiffChange);
 
-  // Timeline steps
-  for (let i = 0; i < 5; i++) {
-    const step = document.getElementById(`timelineStep${i}`) as HTMLButtonElement;
-    if (step) {
-      step.addEventListener('click', () => showTimelineContent(i));
-    }
+  byId<HTMLButtonElement>('deriveDiff').addEventListener('click', deriveCharacteristicFromCipher);
+  byId<HTMLButtonElement>('add100').addEventListener('click', () => collectAndAddPairs(100));
+  byId<HTMLButtonElement>('add500').addEventListener('click', () => collectAndAddPairs(500));
+  byId<HTMLButtonElement>('add1000').addEventListener('click', () => collectAndAddPairs(1000));
+  byId<HTMLButtonElement>('clearPairs').addEventListener('click', clearAllPairs);
+  byId<HTMLButtonElement>('runAttack').addEventListener('click', runAttackOnCollectedPairs);
+  byId<HTMLButtonElement>('runSweep').addEventListener('click', runSweep);
+  byId<HTMLButtonElement>('applySeed').addEventListener('click', applySeed);
+  byId<HTMLButtonElement>('revealK4').addEventListener('click', revealK4);
+
+  const gotoSbox = document.getElementById('gotoSboxLink');
+  if (gotoSbox) {
+    gotoSbox.addEventListener('click', (e) => {
+      e.preventDefault();
+      switchTab('sbox');
+    });
   }
 
-  // Trace controls
-  const traceNext = document.getElementById('traceNext') as HTMLButtonElement;
-  const traceReset = document.getElementById('traceReset') as HTMLButtonElement;
-  if (traceNext) traceNext.addEventListener('click', traceNextStage);
-  if (traceReset) traceReset.addEventListener('click', resetTrace);
+  // Trace tab.
+  const traceP1 = byId<HTMLInputElement>('traceP1');
+  const traceP2 = byId<HTMLInputElement>('traceP2');
+  traceP1.value = p1Input.value;
+  traceP2.value = p2Input.value;
+  traceP1.addEventListener('input', () => {
+    p1Input.value = traceP1.value;
+    onPlaintextChange();
+  });
+  traceP2.addEventListener('input', () => {
+    p2Input.value = traceP2.value;
+    onPlaintextChange();
+  });
+  byId<HTMLButtonElement>('traceStep').addEventListener('click', traceStepForward);
+  byId<HTMLButtonElement>('traceShowAll').addEventListener('click', traceShowAll);
+  byId<HTMLButtonElement>('traceReset').addEventListener('click', traceResetClick);
+
+  // S-box swap.
+  byId<HTMLButtonElement>('useWeakSbox').addEventListener('click', () => switchSbox('weak'));
+  byId<HTMLButtonElement>('useStrongSbox').addEventListener('click', () => switchSbox('strong'));
+
+  // DDT click coupling.
+  byId<HTMLButtonElement>('useInAttack').addEventListener('click', useDDTCellInAttack);
+
+  // Timeline.
+  for (let i = 0; i < 5; i++) {
+    const step = document.getElementById(`timelineStep${i}`);
+    if (step) step.addEventListener('click', () => showTimelineContent(i));
+  }
 }
 
 function switchTab(tabName: string) {
-  // Hide all tabs and update ARIA
-  const tabs = document.querySelectorAll('.tab-content');
-  tabs.forEach((tab) => {
+  document.querySelectorAll('.tab-content').forEach((tab) => {
     tab.classList.remove('active');
     tab.setAttribute('aria-hidden', 'true');
   });
-
-  // Deactivate all buttons and update ARIA
-  const buttons = document.querySelectorAll('.tab-button');
-  buttons.forEach((btn) => {
+  document.querySelectorAll('.tab-button').forEach((btn) => {
     btn.classList.remove('active');
     btn.setAttribute('aria-selected', 'false');
     btn.setAttribute('tabindex', '-1');
   });
 
-  // Show selected tab
   const selectedTab = document.getElementById(tabName);
   if (selectedTab) {
     selectedTab.classList.add('active');
     selectedTab.removeAttribute('aria-hidden');
   }
-
-  // Activate selected button
   const selectedButton = document.querySelector(`.tab-button[data-tab="${tabName}"]`);
   if (selectedButton) {
     selectedButton.classList.add('active');
@@ -173,7 +217,6 @@ function toggleTheme() {
   const html = document.documentElement;
   const currentTheme = html.getAttribute('data-theme') || 'dark';
   const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-  
   html.setAttribute('data-theme', newTheme);
   localStorage.setItem('theme', newTheme);
   updateThemeToggleUI();
@@ -182,39 +225,85 @@ function toggleTheme() {
 function updateThemeToggleUI() {
   const html = document.documentElement;
   const currentTheme = html.getAttribute('data-theme') || 'dark';
-  const button = document.getElementById('themeToggle') as HTMLButtonElement;
-  
-  if (button) {
-    if (currentTheme === 'dark') {
-      button.textContent = '🌙';
-      button.setAttribute('aria-label', 'Switch to light mode');
-    } else {
-      button.textContent = '☀️';
-      button.setAttribute('aria-label', 'Switch to dark mode');
-    }
+  const button = document.getElementById('themeToggle') as HTMLButtonElement | null;
+  if (!button) return;
+  if (currentTheme === 'dark') {
+    button.textContent = '🌙';
+    button.setAttribute('aria-label', 'Switch to light mode');
+  } else {
+    button.textContent = '☀️';
+    button.setAttribute('aria-label', 'Switch to dark mode');
   }
 }
 
 // ============================================================================
-// Attack Tab - Plaintext Display
+// Plaintext and output-diff controls
 // ============================================================================
 
-function updatePlaintextDisplay() {
-  const p1Input = document.getElementById('p1') as HTMLInputElement;
-  const p2Input = document.getElementById('p2') as HTMLInputElement;
-  const diffDisplay = document.getElementById('plainDiff') as HTMLElement;
-
-  let p1 = parseInt(p1Input.value || '0', 16);
-  let p2 = parseInt(p2Input.value || '0', 16);
-
+function onPlaintextChange() {
+  const p1Input = byId<HTMLInputElement>('p1');
+  const p2Input = byId<HTMLInputElement>('p2');
+  const p1 = parseInt(p1Input.value || '0', 16) & 0xFF;
+  const p2 = parseInt(p2Input.value || '0', 16) & 0xFF;
   const diff = (p1 ^ p2) & 0xFF;
-  diffDisplay.textContent = `0x${diff.toString(16).toUpperCase().padStart(2, '0')}`;
-  
+
+  byId('plainDiff').textContent = `0x${hex2(diff)}`;
   state.selectedInputDiff = diff;
+
+  // Mirror to trace inputs if present.
+  const tp1 = document.getElementById('traceP1') as HTMLInputElement | null;
+  const tp2 = document.getElementById('traceP2') as HTMLInputElement | null;
+  if (tp1 && document.activeElement !== tp1) tp1.value = p1Input.value;
+  if (tp2 && document.activeElement !== tp2) tp2.value = p2Input.value;
+
+  rebuildTrace();
+  renderTracePipeline();
+
+  // Changing input diff invalidates current pairs.
+  if (state.collectedPairs.length > 0) {
+    state.collectedPairs = [];
+    state.lastAttackResults = null;
+    hideResults();
+    updatePairStatus();
+  }
+}
+
+function onOutDiffChange() {
+  const v = parseInt(byId<HTMLInputElement>('outDiff').value || '0', 16) & 0xFF;
+  state.selectedOutputDiff = v;
+  byId('characteristicStatus').textContent =
+    `Target Δ before last S-box: 0x${hex2(v)} (manually set).`;
+}
+
+function applySeed() {
+  const v = parseInt(byId<HTMLInputElement>('seedInput').value || '0', 16) | 0;
+  seedRng(v);
+  state.collectedPairs = [];
+  state.lastAttackResults = null;
+  updatePairStatus();
+  hideResults();
+  byId('attackStatus').textContent =
+    `Seed reset to 0x${(getRngSeed()).toString(16).toUpperCase()}. Collect pairs and run again.`;
+}
+
+function revealK4() {
+  byId('hiddenK4').textContent = `0x${hex2(state.spnKey.subkeys[4])}`;
+  byId<HTMLButtonElement>('revealK4').style.display = 'none';
+}
+
+function updateMasterKeyDisplay() {
+  byId('masterKeyDisplay').textContent =
+    `0x${state.masterKey.toString(16).toUpperCase().padStart(4, '0')}`;
+}
+
+function updateHiddenK4() {
+  byId('hiddenK4').textContent = '••';
+  const btn = document.getElementById('revealK4') as HTMLButtonElement | null;
+  if (btn) btn.style.display = '';
 }
 
 function updatePairStatus() {
-  const status = document.getElementById('pairStatus') as HTMLElement;
+  const status = byId('pairStatus');
   const needed = 500 - state.collectedPairs.length;
   if (needed <= 0) {
     status.textContent = `${state.collectedPairs.length} pairs collected. Ready to attack!`;
@@ -235,85 +324,138 @@ function clearAllPairs() {
   state.collectedPairs = [];
   state.lastAttackResults = null;
   updatePairStatus();
-  const resultsSection = document.getElementById('resultsSection') as HTMLElement;
-  if (resultsSection) {
-    resultsSection.style.display = 'none';
-  }
+  hideResults();
+}
+
+function hideResults() {
+  const r = document.getElementById('resultsSection');
+  if (r) r.style.display = 'none';
 }
 
 // ============================================================================
-// Attack Execution
+// Empirical characteristic derivation
+// ============================================================================
+
+function deriveCharacteristicFromCipher() {
+  const ranked = deriveCharacteristic(state.spnKey, state.selectedInputDiff, 4000);
+  const best = ranked[0];
+  state.selectedOutputDiff = best.outputDiff;
+  byId<HTMLInputElement>('outDiff').value = hex2(best.outputDiff);
+
+  const second = ranked[1];
+  const ratio = second ? (best.count / Math.max(second.count, 1)).toFixed(2) : '∞';
+  byId('characteristicStatus').innerHTML =
+    `Sampled 4 000 pairs through 3 rounds. Peak Δ = ` +
+    `<span class="mono">0x${hex2(best.outputDiff)}</span> with probability ` +
+    `<strong>${(best.probability * 100).toFixed(2)}%</strong> ` +
+    `(${ratio}× the runner-up). The attack will target this differential.`;
+}
+
+// ============================================================================
+// Attack execution
 // ============================================================================
 
 function runAttackOnCollectedPairs() {
   if (state.collectedPairs.length === 0) {
-    alert('Please collect some pairs first!');
+    byId('attackStatus').textContent = 'Please collect some pairs first.';
     return;
   }
 
-  const status = document.getElementById('attackStatus') as HTMLElement;
-  status.textContent = 'Running attack...';
+  byId('attackStatus').textContent = 'Running attack...';
 
-  // Run the attack
   const results = attackLastRound(state.collectedPairs, state.selectedOutputDiff);
   state.lastAttackResults = results;
+  state.lastOpCount = state.collectedPairs.length * 256 * 2; // 2 partial decryptions per pair per candidate
 
-  // Display results
-  const resultsSection = document.getElementById('resultsSection') as HTMLElement;
+  showAttackResults(results);
+  updateOpCounter();
+
+  byId('attackStatus').textContent =
+    `Attack complete. Top candidate: 0x${hex2(results[0].candidateKey)}. ` +
+    `${state.lastOpCount.toLocaleString()} partial decryptions performed.`;
+}
+
+function showAttackResults(results: AttackResult[]) {
+  const resultsSection = byId('resultsSection');
   resultsSection.style.display = 'block';
 
   const recoveredKey = identifyCorrectKey(results);
-  const correctKeyRank = getKeyRank(results, state.spnKey.subkeys[3]);
+  const correctK4 = state.spnKey.subkeys[4];
+  const correctKeyRank = getKeyRank(results, correctK4);
+  const margin = results.length > 1 ? results[0].biasCount - results[1].biasCount : results[0].biasCount;
 
-  const recoveredKeyEl = document.getElementById('recoveredKey') as HTMLElement;
-  const correctKeyRankEl = document.getElementById('correctKeyRank') as HTMLElement;
-  const topBiasEl = document.getElementById('topBias') as HTMLElement;
+  byId('recoveredKey').textContent = `0x${hex2(recoveredKey)}`;
+  byId('correctKeyRank').textContent = String(correctKeyRank);
+  byId('topBias').textContent = String(results[0].biasCount);
+  byId('biasMargin').textContent = String(margin);
 
-  recoveredKeyEl.textContent = `0x${recoveredKey.toString(16).toUpperCase().padStart(2, '0')}`;
-  correctKeyRankEl.textContent = correctKeyRank.toString();
-  topBiasEl.textContent = results[0].biasCount.toString();
-
-  // Show success if we recovered the correct key
-  if (recoveredKey === state.spnKey.subkeys[3]) {
-    const successMsg = document.getElementById('successMessage') as HTMLElement;
-    const actualKeyEl = document.getElementById('actualKey') as HTMLElement;
-    const recoveredKeyTextEl = document.getElementById('recoveredKeyText') as HTMLElement;
-
-    successMsg.style.display = 'block';
-    actualKeyEl.textContent = `0x${state.spnKey.subkeys[3].toString(16).toUpperCase().padStart(2, '0')}`;
-    recoveredKeyTextEl.textContent = `0x${recoveredKey.toString(16).toUpperCase().padStart(2, '0')}`;
-  }
-
-  // Draw bias chart
   drawBiasChart(results);
 
-  status.textContent = `Attack complete. Top candidate: 0x${recoveredKey.toString(16).toUpperCase().padStart(2, '0')}`;
+  const success = byId('successMessage');
+  const failure = byId('failureMessage');
+  if (recoveredKey === correctK4) {
+    success.style.display = 'block';
+    failure.style.display = 'none';
+    byId('actualKey').textContent = `0x${hex2(correctK4)}`;
+    byId('recoveredKeyText').textContent = `0x${hex2(recoveredKey)}`;
+  } else {
+    success.style.display = 'none';
+    failure.style.display = 'block';
+    byId('failureExplain').innerHTML =
+      `Top candidate 0x${hex2(recoveredKey)} ≠ actual K₄ 0x${hex2(correctK4)} ` +
+      `(rank ${correctKeyRank}). The chosen differential 0x${hex2(state.selectedInputDiff)}→` +
+      `0x${hex2(state.selectedOutputDiff)} may be low-probability, or you need more pairs. ` +
+      `Try <em>Derive empirically</em> in Step 1½, or add 500–1000 more pairs.`;
+  }
+}
+
+function updateOpCounter() {
+  byId('opCount').textContent = state.lastOpCount.toLocaleString();
+  // Toy "differential cost" = candidate count × pairs.
+  byId('diffToy').textContent =
+    `256 × ${state.collectedPairs.length} = ${state.lastOpCount.toLocaleString()}`;
 }
 
 // ============================================================================
-// Visualization - Bias Chart
+// Learning-curve sweep
 // ============================================================================
 
-function drawBiasChart(results: AttackResult[]) {
-  const canvas = document.getElementById('biasChart') as HTMLCanvasElement;
-  if (!canvas) return;
+function runSweep() {
+  const sizes = [50, 100, 200, 500, 1000, 2000];
+  const correctK4 = state.spnKey.subkeys[4];
+  const points: { n: number; rank: number; bias: number }[] = [];
 
+  // Use the seeded RNG so the sweep is deterministic given the current seed.
+  for (const n of sizes) {
+    const pairs = collectPairs(state.spnKey, state.selectedInputDiff, n);
+    const results = attackLastRound(pairs, state.selectedOutputDiff);
+    const rank = getKeyRank(results, correctK4);
+    points.push({ n, rank, bias: results[0].biasCount });
+  }
+
+  // Make sure the results section is visible to display the chart.
+  byId('resultsSection').style.display = 'block';
+  drawSweepChart(points);
+
+  byId('attackStatus').textContent =
+    `Sweep complete. Ranks: ${points.map((p) => `${p.n}→${p.rank}`).join(', ')}`;
+}
+
+function drawSweepChart(points: { n: number; rank: number }[]) {
+  const canvas = document.getElementById('sweepChart') as HTMLCanvasElement | null;
+  if (!canvas) return;
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
-  // Take top 10 candidates
-  const top10 = results.slice(0, 10);
   const width = canvas.width;
   const height = canvas.height;
   const padding = 40;
   const graphWidth = width - padding * 2;
   const graphHeight = height - padding * 2;
 
-  // Clear canvas
   ctx.fillStyle = 'rgba(15, 15, 30, 0.8)';
   ctx.fillRect(0, 0, width, height);
 
-  // Draw grid
   ctx.strokeStyle = 'rgba(42, 42, 62, 0.5)';
   ctx.lineWidth = 1;
   for (let i = 0; i <= 5; i++) {
@@ -324,32 +466,103 @@ function drawBiasChart(results: AttackResult[]) {
     ctx.stroke();
   }
 
-  // Find max bias
-  const maxBias = Math.max(...top10.map((r) => r.biasCount));
+  const maxRank = Math.max(...points.map((p) => p.rank), 10);
+  const dx = graphWidth / Math.max(points.length - 1, 1);
 
-  // Draw bars
+  ctx.strokeStyle = 'rgba(0, 217, 255, 0.9)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  points.forEach((pt, i) => {
+    const x = padding + dx * i;
+    const y = padding + graphHeight * (pt.rank - 1) / Math.max(maxRank - 1, 1);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  ctx.fillStyle = 'rgba(0, 216, 111, 0.9)';
+  points.forEach((pt, i) => {
+    const x = padding + dx * i;
+    const y = padding + graphHeight * (pt.rank - 1) / Math.max(maxRank - 1, 1);
+    ctx.beginPath();
+    ctx.arc(x, y, 4, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  ctx.fillStyle = 'rgba(224, 224, 243, 0.8)';
+  ctx.font = '12px monospace';
+  ctx.textAlign = 'center';
+  points.forEach((pt, i) => {
+    const x = padding + dx * i;
+    ctx.fillText(`${pt.n}`, x, height - padding + 18);
+    const y = padding + graphHeight * (pt.rank - 1) / Math.max(maxRank - 1, 1);
+    ctx.fillText(`#${pt.rank}`, x, y - 8);
+  });
+
+  ctx.strokeStyle = 'rgba(160, 160, 176, 0.5)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(padding, padding);
+  ctx.lineTo(padding, height - padding);
+  ctx.lineTo(width - padding, height - padding);
+  ctx.stroke();
+
+  ctx.fillStyle = 'rgba(160, 160, 176, 0.7)';
+  ctx.font = '11px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('rank of correct K₄ (1 = perfect)', padding, padding - 10);
+  ctx.textAlign = 'center';
+  ctx.fillText('pairs collected', width / 2, height - 6);
+}
+
+// ============================================================================
+// Bias chart (top-10 candidates)
+// ============================================================================
+
+function drawBiasChart(results: AttackResult[]) {
+  const canvas = document.getElementById('biasChart') as HTMLCanvasElement | null;
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const top10 = results.slice(0, 10);
+  const width = canvas.width;
+  const height = canvas.height;
+  const padding = 40;
+  const graphWidth = width - padding * 2;
+  const graphHeight = height - padding * 2;
+
+  ctx.fillStyle = 'rgba(15, 15, 30, 0.8)';
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.strokeStyle = 'rgba(42, 42, 62, 0.5)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 5; i++) {
+    const y = padding + (graphHeight / 5) * i;
+    ctx.beginPath();
+    ctx.moveTo(padding, y);
+    ctx.lineTo(width - padding, y);
+    ctx.stroke();
+  }
+
+  const maxBias = Math.max(...top10.map((r) => r.biasCount), 1);
   const barWidth = graphWidth / top10.length;
   top10.forEach((result, index) => {
     const barHeight = (result.biasCount / maxBias) * graphHeight;
     const x = padding + index * barWidth + barWidth * 0.1;
     const y = padding + graphHeight - barHeight;
 
-    // Get correct key rank
-    const isCorrect = result.candidateKey === state.spnKey.subkeys[3];
-    ctx.fillStyle = isCorrect ? 'rgba(0, 216, 111, 0.8)' : 'rgba(0, 217, 255, 0.6)';
+    const isCorrect = result.candidateKey === state.spnKey.subkeys[4];
+    ctx.fillStyle = isCorrect ? 'rgba(0, 216, 111, 0.85)' : 'rgba(0, 217, 255, 0.55)';
     ctx.fillRect(x, y, barWidth * 0.8, barHeight);
 
-    // Draw label
-    ctx.fillStyle = 'rgba(224, 224, 243, 0.7)';
+    ctx.fillStyle = 'rgba(224, 224, 243, 0.8)';
     ctx.font = '12px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(result.candidateKey.toString(16).padStart(2, '0'), x + barWidth * 0.4, height - padding + 20);
-
-    // Draw count
+    ctx.fillText(hex2(result.candidateKey), x + barWidth * 0.4, height - padding + 18);
     ctx.fillText(result.biasCount.toString(), x + barWidth * 0.4, y - 5);
   });
 
-  // Draw axes
   ctx.strokeStyle = 'rgba(160, 160, 176, 0.5)';
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -358,32 +571,72 @@ function drawBiasChart(results: AttackResult[]) {
   ctx.lineTo(width - padding, padding);
   ctx.stroke();
 
-  // Labels
   ctx.fillStyle = 'rgba(160, 160, 176, 0.7)';
   ctx.font = '12px sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('Candidate Key (hex)', width / 2, height - 10);
-
-  ctx.textAlign = 'right';
-  ctx.fillText('Bias Count', 20, padding);
+  ctx.fillText('Candidate K₄ (hex) — correct key shown in green', width / 2, height - 6);
 }
 
 // ============================================================================
-// S-box Visualization
+// S-box swap
+// ============================================================================
+
+function switchSbox(name: SboxName) {
+  if (getActiveSboxName() === name) return;
+  setSbox(name);
+
+  // The cipher changed, so everything stale must reset.
+  state.spnKey = generateKey(state.masterKey);
+  state.collectedPairs = [];
+  state.lastAttackResults = null;
+
+  syncSboxToggleUI();
+  updateActiveSboxLabel();
+  updateHiddenK4();
+  renderDDT();
+  renderSBox();
+  hideResults();
+  updatePairStatus();
+  rebuildTrace();
+  renderTracePipeline();
+
+  byId('attackStatus').textContent =
+    `S-box swapped to "${name}". Cipher reset; collect new pairs and run the attack to see ` +
+    `whether the bias still separates from noise.`;
+}
+
+function syncSboxToggleUI() {
+  const weak = byId<HTMLButtonElement>('useWeakSbox');
+  const strong = byId<HTMLButtonElement>('useStrongSbox');
+  const active = getActiveSboxName();
+  weak.classList.toggle('active', active === 'weak');
+  weak.setAttribute('aria-checked', String(active === 'weak'));
+  strong.classList.toggle('active', active === 'strong');
+  strong.setAttribute('aria-checked', String(active === 'strong'));
+}
+
+function updateActiveSboxLabel() {
+  const label = byId('activeSboxLabel');
+  label.textContent = getActiveSboxName() === 'weak' ? 'Weak (toy)' : 'Strong (PRESENT)';
+}
+
+// ============================================================================
+// S-box visualization
 // ============================================================================
 
 function renderSBox() {
   const sbox = getSbox() as number[];
-  const container = document.getElementById('sboxGrid') as HTMLElement;
-  if (!container) return;
-
-  container.innerHTML = ''; // Clear
+  const container = byId('sboxGrid');
+  container.innerHTML = '';
 
   for (let i = 0; i < 16; i++) {
     const cell = document.createElement('div');
     cell.className = 'sbox-cell';
     cell.setAttribute('role', 'gridcell');
-    cell.setAttribute('aria-label', `S-box input ${i.toString(16).toUpperCase()}: output ${sbox[i].toString(16).toUpperCase()}`);
+    cell.setAttribute(
+      'aria-label',
+      `S-box input ${i.toString(16).toUpperCase()}: output ${sbox[i].toString(16).toUpperCase()}`,
+    );
     const output = sbox[i];
     const intensity = (output / 15) * 100;
     cell.style.background = `hsl(200, 70%, ${50 - intensity * 0.3}%)`;
@@ -391,37 +644,31 @@ function renderSBox() {
     container.appendChild(cell);
   }
 
-  // S-box assessment
-  const assessment = document.querySelector('#sbox .sbox-assessment') as HTMLElement;
-  if (assessment) {
-    const ddt = computeDDT(sbox);
-    const props = verifyDDTProperties(ddt);
-    const contentDiv = assessment.querySelector('#sboxAssessmentContent') as HTMLElement;
-    if (contentDiv) {
-      contentDiv.innerHTML = `
-        <p><strong>Max DDT Entry:</strong> ${props.maxDDTValue} (out of 16)</p>
-        <p><strong>Assessment:</strong> ${
-          props.isWeak
-            ? 'WEAK - This S-box has poor differential properties'
-            : 'GOOD - This S-box resists differential attacks well'
-        }</p>
-        <p><strong>Differential Limit:</strong> Success probability ≤ ${(props.maxDDTValue / 16).toFixed(2)}</p>
-      `;
-    }
-  }
+  const ddt = computeDDT(sbox);
+  const props = verifyDDTProperties(ddt);
+  const contentDiv = byId('sboxAssessmentContent');
+  contentDiv.innerHTML = `
+    <p><strong>Max non-trivial DDT entry:</strong> ${props.maxDDTValue} (out of 16)</p>
+    <p><strong>Assessment:</strong> ${
+      props.isWeak
+        ? 'Weak — this S-box leaks a high-probability differential the attack can exploit.'
+        : 'Strong — the differential probability ceiling is ≤ 4/16, the lower bound for a 4-bit permutation.'
+    }</p>
+    <p><strong>Per-round differential probability ceiling:</strong> ≤ ${(props.maxDDTValue / 16).toFixed(2)} per active S-box.</p>
+  `;
 }
 
 // ============================================================================
-// DDT Visualization
+// DDT visualization
 // ============================================================================
+
+let lastDDTClick: { inputDiff: number; outputDiff: number; count: number } | null = null;
 
 function renderDDT() {
   const sbox = getSbox() as number[];
   const ddt = computeDDT(sbox);
-  const container = document.getElementById('ddtGrid') as HTMLElement;
-  if (!container) return;
-
-  container.innerHTML = ''; // Clear
+  const container = byId('ddtGrid');
+  container.innerHTML = '';
 
   for (let inputDiff = 0; inputDiff < 16; inputDiff++) {
     for (let outputDiff = 0; outputDiff < 16; outputDiff++) {
@@ -430,134 +677,189 @@ function renderDDT() {
       const cell = document.createElement('div');
       cell.className = 'ddt-cell';
       cell.setAttribute('role', 'gridcell');
-      cell.setAttribute('data-input', inputDiff.toString());
-      cell.setAttribute('data-output', outputDiff.toString());
-      cell.setAttribute('aria-label', `Input diff 0x${inputDiff.toString(16).toUpperCase()}, output diff 0x${outputDiff.toString(16).toUpperCase()}: count ${count}`);
+      cell.setAttribute(
+        'aria-label',
+        `Input diff 0x${inputDiff.toString(16).toUpperCase()}, output diff 0x${outputDiff
+          .toString(16)
+          .toUpperCase()}: count ${count}`,
+      );
       cell.setAttribute('tabindex', '0');
 
-      // Color coding
-      if (count === 0) {
-        cell.classList.add('ddt-0');
-      } else if (count <= 2) {
-        cell.classList.add('ddt-1-2');
-      } else if (count <= 4) {
-        cell.classList.add('ddt-3-4');
-      } else if (count <= 6) {
-        cell.classList.add('ddt-5-6');
-      } else {
-        cell.classList.add('ddt-7-plus');
-      }
+      if (count === 0) cell.classList.add('ddt-0');
+      else if (count <= 2) cell.classList.add('ddt-1-2');
+      else if (count <= 4) cell.classList.add('ddt-3-4');
+      else if (count <= 6) cell.classList.add('ddt-5-6');
+      else cell.classList.add('ddt-7-plus');
 
       cell.textContent = count > 0 ? count.toString() : '·';
-
       cell.addEventListener('click', () => showDDTInfo(inputDiff, outputDiff, count));
       container.appendChild(cell);
     }
   }
+  // Clear previously selected info, since the new DDT may have different counts.
+  const infoDiv = document.getElementById('ddtClickInfo');
+  if (infoDiv) infoDiv.style.display = 'none';
+  lastDDTClick = null;
 }
 
 function showDDTInfo(inputDiff: number, outputDiff: number, count: number) {
-  const infoDiv = document.getElementById('ddtClickInfo') as HTMLElement;
-  if (!infoDiv) return;
-
+  const infoDiv = byId('ddtClickInfo');
   infoDiv.style.display = 'block';
 
-  document.getElementById('ddtInputDiff')!.textContent = `0x${inputDiff.toString(16).toUpperCase()}`;
-  document.getElementById('ddtOutputDiff')!.textContent = `0x${outputDiff.toString(16).toUpperCase()}`;
-  document.getElementById('ddtCount')!.textContent = count.toString();
-  document.getElementById('ddtProb')!.textContent = `${((count / 16) * 100).toFixed(1)}%`;
+  byId('ddtInputDiff').textContent = `0x${inputDiff.toString(16).toUpperCase()}`;
+  byId('ddtOutputDiff').textContent = `0x${outputDiff.toString(16).toUpperCase()}`;
+  byId('ddtCount').textContent = count.toString();
+  byId('ddtProb').textContent = `${((count / 16) * 100).toFixed(1)}%`;
 
-  const exploitable = document.getElementById('ddtExploitable')!;
+  const exploitable = byId('ddtExploitable');
+  const useBtn = byId<HTMLButtonElement>('useInAttack');
   if (inputDiff === 0) {
-    exploitable.textContent = '✓ Trivial case (zero differential)';
+    exploitable.textContent = 'Trivial case (zero input difference).';
     exploitable.style.color = 'var(--text-secondary)';
+    useBtn.style.display = 'none';
   } else if (count > 4) {
     exploitable.textContent =
-      '⚠ This differential is exploitable (count > 4 is unusual for good S-boxes)';
+      `Exploitable: probability ${((count / 16) * 100).toFixed(1)}% is unusually high (good S-boxes peak at 4/16).`;
     exploitable.style.color = 'var(--warning)';
+    useBtn.style.display = '';
   } else if (count > 0) {
-    exploitable.textContent = '● This differential exists (usable in attacks)';
+    exploitable.textContent = 'Usable but low-probability; the attack needs more pairs.';
     exploitable.style.color = 'var(--accent-tertiary)';
+    useBtn.style.display = '';
   } else {
-    exploitable.textContent = '✗ This differential is impossible';
+    exploitable.textContent = 'Impossible differential — this transition never occurs.';
     exploitable.style.color = 'var(--text-secondary)';
+    useBtn.style.display = 'none';
   }
+
+  lastDDTClick = { inputDiff, outputDiff, count };
+}
+
+function useDDTCellInAttack() {
+  if (!lastDDTClick) return;
+  // The DDT is over a single 4-bit S-box. Map its input/output diffs onto
+  // the byte by placing them in the low nibble (so the high-nibble S-box
+  // sees Δ=0 and the low-nibble S-box sees the chosen Δ).
+  const byteIn = lastDDTClick.inputDiff & 0xF;
+  const byteOut = lastDDTClick.outputDiff & 0xF;
+
+  // Pick P1 = 0x00, P2 = byteIn so that P1 ⊕ P2 = byteIn.
+  byId<HTMLInputElement>('p1').value = '00';
+  byId<HTMLInputElement>('p2').value = hex2(byteIn);
+  byId<HTMLInputElement>('outDiff').value = hex2(byteOut);
+  state.selectedInputDiff = byteIn;
+  state.selectedOutputDiff = byteOut;
+
+  onPlaintextChange();
+  onOutDiffChange();
+  byId('characteristicStatus').innerHTML =
+    `Seeded from DDT click: ΔIn=0x${hex2(byteIn)}, ΔOut=0x${hex2(byteOut)}. ` +
+    `Note: this is a <em>single-round</em> differential; for 4 rounds you'll want to ` +
+    `<em>derive empirically</em> to find the actual peak the attack should target.`;
+  switchTab('attack');
 }
 
 // ============================================================================
-// Differential Trace
+// Differential trace
 // ============================================================================
 
-let traceStep = 0;
-
-function traceNextStage() {
-  traceStep = (traceStep + 1) % 5;
-  updateTraceDisplay();
+function rebuildTrace() {
+  const p1 = parseInt(byId<HTMLInputElement>('p1').value || '0', 16) & 0xFF;
+  const p2 = parseInt(byId<HTMLInputElement>('p2').value || '0', 16) & 0xFF;
+  state.traceStages = traceEncryption(p1, p2, state.spnKey);
+  state.traceVisibleCount = Math.min(state.traceVisibleCount, state.traceStages.length);
+  if (state.traceVisibleCount < 1) state.traceVisibleCount = 1;
 }
 
-function resetTrace() {
-  traceStep = 0;
-  updateTraceDisplay();
-}
-
-function updateTraceDisplay() {
-  const p1Input = document.getElementById('p1') as HTMLInputElement;
-  const p2Input = document.getElementById('p2') as HTMLInputElement;
-
-  let p1 = parseInt(p1Input.value || '0', 16);
-  let p2 = parseInt(p2Input.value || '0', 16);
-
-  const diff = (p1 ^ p2) & 0xFF;
-
-  // Update stage marker
-  const stageNames = ['Input difference', 'After S-box (Round 1)', 'After Permutation (Round 1)', 'After S-box (Round 2)', 'After Permutation (Round 2)'];
-  const stageStatus = document.getElementById('traceStage') as HTMLElement;
-  if (stageStatus) {
-    stageStatus.textContent = stageNames[traceStep] || 'Complete';
-  }
-
-  // Show appropriate information
-  for (let i = 0; i < 5; i++) {
-    const stageBits = document.getElementById(`stageBits${i}`) as HTMLElement;
-    const stageValue = document.getElementById(`stageValue${i}`) as HTMLElement;
-    const stageActive = document.getElementById(`stageActive${i}`) as HTMLElement;
-    const stageProbability = document.getElementById(`stageProbability${i}`) as HTMLElement;
-
-    if (i <= traceStep) {
-      // Show this stage
-      const currentDiff = i === 0 ? diff : diff; // Simplified for demo
-      renderBitDisplay(stageBits, currentDiff);
-      stageValue.textContent = `0x${currentDiff.toString(16).toUpperCase().padStart(2, '0')}`;
-      stageActive.textContent = popcount(currentDiff).toString();
-      stageProbability.textContent = stageNames[i].includes('Probability') ? '?' : '1.00';
-    } else {
-      // Hide future stages
-      stageBits.innerHTML = '';
-      stageValue.textContent = '?';
-      stageActive.textContent = '—';
-      stageProbability.textContent = '—';
-    }
-  }
-}
-
-function renderBitDisplay(container: HTMLElement, byte: number) {
+function renderTracePipeline() {
+  const container = byId('tracePipeline');
   container.innerHTML = '';
-  for (let i = 7; i >= 0; i--) {
-    const bit = (byte >> i) & 1;
-    const bitEl = document.createElement('div');
-    bitEl.className = `bit ${bit ? 'active' : 'inactive'}`;
-    bitEl.title = `Bit ${i}: ${bit}`;
-    container.appendChild(bitEl);
+
+  state.traceStages.forEach((stage, idx) => {
+    const prev = idx > 0 ? state.traceStages[idx - 1] : null;
+    const diffChanged = prev !== null && prev.diff !== stage.diff;
+    const visible = idx < state.traceVisibleCount;
+
+    const row = document.createElement('div');
+    row.className = `trace-row kind-${stage.kind}` + (visible ? '' : ' hidden') +
+      (diffChanged ? ' diff-changed' : '');
+    row.setAttribute('role', 'listitem');
+
+    // Stage label + tag.
+    const labelCell = document.createElement('div');
+    labelCell.className = 'stage-label';
+    labelCell.textContent = stage.label;
+    row.appendChild(labelCell);
+
+    const tagCell = document.createElement('div');
+    const tag = document.createElement('span');
+    tag.className = `stage-tag ${stage.kind}`;
+    tag.textContent = stage.kind === 'xor-key' ? 'XOR-K'
+      : stage.kind === 'sbox' ? 'S-box'
+      : stage.kind === 'permute' ? 'Permute' : 'Input';
+    tagCell.appendChild(tag);
+    row.appendChild(tagCell);
+
+    // State pair.
+    const statePair = document.createElement('div');
+    statePair.className = 'state-pair';
+    statePair.innerHTML = `P₁=<span class="mono">0x${hex2(stage.state1)}</span>` +
+      ` &nbsp; P₂=<span class="mono">0x${hex2(stage.state2)}</span>`;
+    row.appendChild(statePair);
+
+    // Diff display: bits + numeric value + preservation marker.
+    const diffRow = document.createElement('div');
+    diffRow.className = 'diff-row';
+    const bits = document.createElement('div');
+    bits.className = 'diff-bits';
+    for (let b = 7; b >= 0; b--) {
+      const bit = (stage.diff >> b) & 1;
+      const dot = document.createElement('div');
+      dot.className = `bit ${bit ? 'active' : 'inactive'}`;
+      dot.title = `bit ${b}: ${bit}`;
+      bits.appendChild(dot);
+    }
+    diffRow.appendChild(bits);
+    const val = document.createElement('span');
+    val.className = 'diff-value';
+    val.textContent = `Δ=0x${hex2(stage.diff)}`;
+    diffRow.appendChild(val);
+    if (prev) {
+      const marker = document.createElement('span');
+      if (stage.diff === prev.diff) {
+        marker.className = 'diff-preservation-marker';
+        marker.textContent = stage.kind === 'xor-key' ? '✓ Δ preserved (XOR rule)' : '= unchanged';
+      } else {
+        marker.className = 'diff-changed-marker';
+        marker.textContent = '↯ Δ changed';
+      }
+      diffRow.appendChild(marker);
+    }
+    row.appendChild(diffRow);
+
+    container.appendChild(row);
+  });
+
+  byId('traceStatus').textContent =
+    `Stage ${state.traceVisibleCount - 1} of ${state.traceStages.length - 1} ` +
+    `(${state.traceVisibleCount}/${state.traceStages.length} visible).`;
+}
+
+function traceStepForward() {
+  if (state.traceVisibleCount < state.traceStages.length) {
+    state.traceVisibleCount++;
+    renderTracePipeline();
   }
 }
 
-function popcount(x: number): number {
-  let count = 0;
-  while (x) {
-    count += x & 1;
-    x >>= 1;
-  }
-  return count;
+function traceShowAll() {
+  state.traceVisibleCount = state.traceStages.length;
+  renderTracePipeline();
+}
+
+function traceResetClick() {
+  state.traceVisibleCount = 1;
+  renderTracePipeline();
 }
 
 // ============================================================================
@@ -617,35 +919,29 @@ const timelineContent = [
 ];
 
 function showTimelineContent(step: number) {
-  // Update active step
   for (let i = 0; i < 5; i++) {
-    const btn = document.getElementById(`timelineStep${i}`) as HTMLElement;
-    if (i === step) {
-      btn.classList.add('active');
-    } else {
-      btn.classList.remove('active');
-    }
+    const btn = document.getElementById(`timelineStep${i}`);
+    if (btn) btn.classList.toggle('active', i === step);
   }
-
-  // Update content
-  const contentDiv = document.querySelector('.timeline-content') as HTMLElement;
+  const contentDiv = document.querySelector('.timeline-content') as HTMLElement | null;
+  if (!contentDiv) return;
   const content = timelineContent[step];
   contentDiv.innerHTML = `<h4>${content.title}</h4>${content.content}`;
 }
 
-// Show first timeline content on load
-document.addEventListener('DOMContentLoaded', () => {
-  setTimeout(() => {
-    showTimelineContent(0);
-  }, 100);
-});
+// ============================================================================
+// Utilities
+// ============================================================================
+
+function hex2(n: number): string {
+  return (n & 0xFF).toString(16).toUpperCase().padStart(2, '0');
+}
 
 // ============================================================================
-// Initialization on DOM Ready
+// Boot
 // ============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
   initializeApp();
-  updatePlaintextDisplay();
-  updateTraceDisplay();
+  onPlaintextChange();
 });

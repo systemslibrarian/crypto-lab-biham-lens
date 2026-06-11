@@ -472,6 +472,209 @@ h4 {
   font-weight: 500;
 }
 
+/* Insight callout — for the "key XOR is transparent" moment */
+.insight-callout {
+  background: linear-gradient(135deg, rgba(0, 217, 255, 0.08), rgba(255, 59, 92, 0.04));
+  border-left: 4px solid var(--accent-tertiary);
+  border-radius: 4px;
+  padding: 1.25rem 1.5rem;
+  margin: 1.5rem 0 2rem;
+}
+
+.insight-callout h4 {
+  color: var(--accent-tertiary);
+  margin-bottom: 0.6rem;
+}
+
+.insight-callout p {
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.insight-callout p:last-child {
+  margin-bottom: 0;
+}
+
+.insight-callout.tight {
+  padding: 0.9rem 1.2rem;
+  margin: 1rem 0 1.5rem;
+}
+
+/* Setup row (S-box + seed cards above the attack steps) */
+.setup-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.setup-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1rem 1.2rem;
+}
+
+.setup-card h4 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-tertiary);
+  margin-bottom: 0.7rem;
+}
+
+.setup-card p {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.4rem;
+}
+
+.setup-card p em {
+  color: var(--text-tertiary);
+}
+
+.muted {
+  color: var(--text-tertiary);
+  font-size: 0.85rem;
+}
+
+.inline-link {
+  color: var(--accent-tertiary);
+  text-decoration: none;
+  font-size: 0.85rem;
+  margin-left: 0.5rem;
+}
+
+.inline-link:hover {
+  text-decoration: underline;
+}
+
+.link-btn {
+  background: transparent;
+  border: none;
+  color: var(--accent-tertiary);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0;
+  margin-left: 0.4rem;
+  text-decoration: underline;
+}
+
+.link-btn:hover {
+  color: #00e8ff;
+}
+
+.form-group.inline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.form-group.inline label {
+  margin-bottom: 0;
+}
+
+.form-group.inline .hex-input {
+  width: auto;
+  flex: 0 1 5rem;
+}
+
+.btn.tight {
+  width: auto;
+  padding: 0.4rem 0.9rem;
+  margin-bottom: 0;
+  min-height: 36px;
+  font-size: 0.8rem;
+}
+
+/* S-box swap toggle */
+.sbox-swap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.btn-toggle {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  padding: 0.6rem 1.1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.btn-toggle:hover {
+  border-color: var(--accent-tertiary);
+  color: var(--text-primary);
+}
+
+.btn-toggle.active {
+  background: rgba(0, 217, 255, 0.15);
+  border-color: var(--accent-tertiary);
+  color: var(--accent-tertiary);
+}
+
+.sbox-swap .muted {
+  flex-basis: 100%;
+}
+
+/* Failure card — pair with success-card visually */
+.failure-card {
+  background: linear-gradient(135deg, rgba(255, 153, 51, 0.1), rgba(255, 59, 92, 0.05));
+  border: 2px solid var(--warning);
+  border-radius: 8px;
+  padding: 1.5rem;
+  text-align: center;
+  margin-top: 2rem;
+}
+
+.failure-icon {
+  font-size: 2.5rem;
+  color: var(--warning);
+  margin-bottom: 0.5rem;
+}
+
+.failure-card h4 {
+  color: var(--warning);
+  margin-bottom: 0.5rem;
+}
+
+.failure-card p {
+  color: var(--text-secondary);
+}
+
+/* Sweep chart */
+#sweepChart {
+  width: 100%;
+  height: auto;
+  margin: 1rem 0 1.5rem;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+/* Complexity panel */
+.complexity-panel {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 2rem;
+  margin-top: 2rem;
+}
+
+.complexity-panel .comparison-table {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+
 /* Differential Trace */
 .trace-container {
   background: var(--bg-secondary);
@@ -481,7 +684,140 @@ h4 {
 }
 
 .trace-controls {
-  margin-bottom: 2rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.trace-controls .btn {
+  width: auto;
+  margin-bottom: 0;
+  padding: 0.5rem 1rem;
+  min-height: 36px;
+  font-size: 0.85rem;
+}
+
+.trace-controls .status {
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+.trace-pipeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 1.5rem;
+}
+
+.trace-row {
+  display: grid;
+  grid-template-columns: 140px 80px 1fr 1fr;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.6rem 0.9rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  transition: opacity 0.2s ease, border-color 0.2s ease;
+}
+
+.trace-row.hidden {
+  opacity: 0.15;
+}
+
+.trace-row.kind-sbox {
+  border-left: 3px solid var(--danger);
+}
+
+.trace-row.kind-xor-key {
+  border-left: 3px solid var(--accent-tertiary);
+}
+
+.trace-row.kind-permute {
+  border-left: 3px solid var(--accent-secondary);
+}
+
+.trace-row.kind-input {
+  border-left: 3px solid var(--text-tertiary);
+}
+
+.trace-row .stage-label {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.trace-row .stage-tag {
+  display: inline-block;
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.stage-tag.xor-key { background: rgba(0, 217, 255, 0.15); color: var(--accent-tertiary); }
+.stage-tag.sbox { background: rgba(255, 59, 92, 0.15); color: var(--danger); }
+.stage-tag.permute { background: rgba(255, 153, 51, 0.15); color: var(--warning); }
+.stage-tag.input { background: var(--bg-tertiary); color: var(--text-tertiary); }
+
+.trace-row .state-pair {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.trace-row .diff-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.trace-row .diff-bits {
+  display: flex;
+  gap: 3px;
+}
+
+.trace-row .diff-bits .bit {
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+}
+
+.trace-row .diff-value {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--accent-tertiary);
+  background: var(--bg-tertiary);
+  padding: 0.1rem 0.4rem;
+  border-radius: 2px;
+}
+
+.trace-row.diff-changed .diff-value {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.diff-preservation-marker {
+  font-size: 0.7rem;
+  color: var(--success);
+  margin-left: 0.4rem;
+}
+
+.diff-changed-marker {
+  font-size: 0.7rem;
+  color: var(--danger);
+  margin-left: 0.4rem;
 }
 
 .trace-stages {

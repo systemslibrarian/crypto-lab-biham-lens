@@ -10,7 +10,8 @@
  */
 
 import { computeDDT, getDifferentialProbability } from './ddt.js';
-import { getSbox } from './sbox.js';
+import { getSbox, applyBothNibbles } from './sbox.js';
+import { permute } from './permutation.js';
 import type { SPNKey } from './spn.js';
 
 /**
@@ -83,8 +84,17 @@ export function traceCharacteristic(
     state2 = (state2 ^ key.subkeys[round]) & 0xFF;
 
     // S-box
-    state1 = ((state1 >> 4) & 0xF) === 0 ? state1 & 0x0F : 0;
-    state2 = ((state2 >> 4) & 0xF) === 0 ? state2 & 0x0F : 0;
+    state1 = applyBothNibbles(state1);
+    state2 = applyBothNibbles(state2);
+
+    // Permutation
+    if (round < rounds - 1) { // Assuming if trace is rounds length, last round of trace might skip permute if it's the 4th round
+      // wait, usually trace is for 3 rounds, so it shouldn't skip unless round === 3
+      if (round < 3) {
+        state1 = permute(state1);
+        state2 = permute(state2);
+      }
+    }
 
     const roundDiff = (state1 ^ state2) & 0xFF;
     roundDiffs.push(roundDiff);
