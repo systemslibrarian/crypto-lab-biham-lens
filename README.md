@@ -1,11 +1,5 @@
 # crypto-lab-biham-lens
 
-**Differential Cryptanalysis in the Browser** — An interactive demonstration of the breakthrough cryptanalytic technique that fundamentally changed our understanding of cipher security.
-
-**[▶ Live Demo](https://systemslibrarian.github.io/crypto-lab-biham-lens/)**
-
----
-
 ## What It Is
 
 **Differential cryptanalysis** is a chosen-plaintext attack on block ciphers that exploits statistical biases in how plaintext differences propagate through encryption to recover key material. Co-invented by Eli Biham and Adi Shamir in 1990, it fundamentally transformed cryptography by proving that large key sizes and block sizes alone do not guarantee security — the underlying mathematical structure must be carefully designed. This demo implements the attack on a simplified 4-round SPN (Substitution-Permutation Network) cipher, demonstrating how observed differences between ciphertext pairs can betray the last round's subkey through biased differential characteristics.
@@ -19,10 +13,13 @@ Differential cryptanalysis is relevant as a cryptanalytic tool in these scenario
 - **Threshold security analysis**: When you have known or chosen encryption oracle access, differential attacks require far fewer queries than exhaustive key search—roughly 500–1000 ciphertext pairs for a toy cipher, versus 2^128 queries for brute force.
 - **Academic cryptanalysis**: For understanding how modern cipher designs (AES, Serpent, ChaCha) harden against this and related attacks through strong S-boxes and high round counts.
 - **When NOT to use it**: Differential cryptanalysis does not apply to ciphers with provably strong S-box differential properties, ciphers with 30+ rounds of diffusion, or scenarios without chosen-plaintext access; in those cases, exhaustive key search or other attacks are more practical.
+- **Do NOT treat the toy 4-round SPN here as a real cipher**: it is a teaching demo built to make the attack visible, not production-strength cryptography.
 
 ## Live Demo
 
-The interactive browser demo at the link above lets you collect ciphertext pairs from a toy 4-round SPN cipher and run a real last-round key recovery attack. You choose plaintext differences, collect ~500 ciphertext pairs corresponding to those differences, and the demo analyzes the statistical bias in the resulting pairs to recover the last round's 8-bit subkey. The demo includes visualizations of how differences propagate through S-box substitution and bit permutation, interactive exploration of the Difference Distribution Table (DDT), and a historical timeline of the attack's discovery and impact.
+**[systemslibrarian.github.io/crypto-lab-biham-lens](https://systemslibrarian.github.io/crypto-lab-biham-lens/)**
+
+The interactive browser demo lets you collect ciphertext pairs from a toy 4-round SPN cipher and run a real last-round key recovery attack. You choose plaintext differences, collect ~500 ciphertext pairs corresponding to those differences, and the demo analyzes the statistical bias in the resulting pairs to recover the last round's 8-bit subkey. The demo includes visualizations of how differences propagate through S-box substitution and bit permutation, interactive exploration of the Difference Distribution Table (DDT), and a historical timeline of the attack's discovery and impact.
 
 ## What Can Go Wrong
 
@@ -42,8 +39,27 @@ Systems and standards that must resist differential cryptanalysis or use concept
 - **SERPENT cipher (1998)**: Co-designed by Eli Biham himself, Serpent uses 32 rounds (extreme redundancy) and carefully selected S-boxes to be provably immune to differential cryptanalysis even if the attacker has access to all round subkeys. It lost the AES competition to Rijndael but remains a reference design for differential-resistant ciphers.
 - **Advanced Encryption Standard (AES / Rijndael, 2001)**: The winning AES design includes a strong S-box with minimal DDT entries (max 4) and multiple diffusion layers (MixColumns) per round to guarantee that differential characteristics cannot reach the final round with practical probability over 10 rounds of encryption.
 - **SPECK and SIMON (NSA, 2013)**: These lightweight block ciphers for IoT devices are analyzed extensively for differential properties; the NSA's published security arguments include differential cryptanalysis proofs, confirming that round counts and S-box properties provide resistance.
-- **NIST Post-Quantum Cryptography Standards (2022–present)**: While primarily focused on lattice and code-based systems, standardization bodies explicitly evaluate lattice-based and permutation-based candidates for resistance to known attacks including differential-like statistical analysis, extending the lessons of differential cryptanalysis to post-quantum era.
+- **NIST Post-Quantum Cryptography Standards (2022–present)**: While primarily focused on lattice and code-based systems, standardization bodies explicitly evaluate lattice-based and permutation-based candidates for resistance to known attacks including differential-like statistical analysis, extending the lessons of differential cryptanalysis to the post-quantum era.
+
+## How to Run Locally
+
+```bash
+git clone https://github.com/systemslibrarian/crypto-lab-biham-lens
+cd crypto-lab-biham-lens/demos/biham-lens
+npm install
+npm run dev
+```
+
+## Related Demos
+
+- [crypto-lab-iron-serpent](https://systemslibrarian.github.io/crypto-lab-iron-serpent/) — the Serpent cipher, co-designed by Biham for differential resistance.
+- [crypto-lab-padding-oracle](https://systemslibrarian.github.io/crypto-lab-padding-oracle/) — a different chosen-ciphertext attack on AES-CBC.
+- [crypto-lab-collision-vault](https://systemslibrarian.github.io/crypto-lab-collision-vault/) — collision attacks on MD5 and SHA-1.
+- [crypto-lab-vigenere-break](https://systemslibrarian.github.io/crypto-lab-vigenere-break/) — classical statistical cryptanalysis of the Vigenère cipher.
+- [crypto-lab-enigma-forge](https://systemslibrarian.github.io/crypto-lab-enigma-forge/) — Enigma and the Bombe, a historical cryptanalysis story.
 
 ---
+
+*One of 60+ browser demos in the [Crypto Lab](https://crypto-lab.systemslibrarian.dev/) suite.*
 
 *"So whether you eat or drink or whatever you do, do it all for the glory of God." — 1 Corinthians 10:31*
