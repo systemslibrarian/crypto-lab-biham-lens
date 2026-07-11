@@ -639,7 +639,12 @@ function renderSBox() {
     );
     const output = sbox[i];
     const intensity = (output / 15) * 100;
-    cell.style.background = `hsl(200, 70%, ${50 - intensity * 0.3}%)`;
+    const lightness = 50 - intensity * 0.3;
+    cell.style.backgroundColor = `hsl(200, 70%, ${lightness}%)`;
+    // Pick the text color per cell so contrast stays >= 4.5:1 across the
+    // whole lightness ramp in both themes (inherited theme text fails at
+    // one end of the ramp).
+    cell.style.color = lightness >= 42 ? '#0f0f1e' : '#ffffff';
     cell.textContent = output.toString(16).toUpperCase();
     container.appendChild(cell);
   }
