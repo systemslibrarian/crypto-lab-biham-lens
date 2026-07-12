@@ -132,13 +132,17 @@
 <!-- END crypto-lab shared header -->
     <a href="#main-content" class="skip-link">Skip to main content</a>
     <div id="app">
-        <header class="header">
-            <div class="header-content">
-                <h1>biham-lens</h1>
-                <p class="subtitle">Differential Cryptanalysis of a Toy SPN Cipher</p>
-                <p class="attribution">by Eli Biham &amp; Adi Shamir (1990)</p>
+        <header class="cl-hero">
+            <div class="cl-hero-main">
+                <h1 class="cl-hero-title">biham-lens</h1>
+                <p class="cl-hero-sub">Differential Cryptanalysis · Biham–Shamir 1990</p>
+                <p class="cl-hero-desc">Run a chosen-plaintext differential attack on a toy SPN cipher: seed plaintext XOR-differences, collect ciphertext pairs, and watch a biased characteristic through the S-boxes rank the correct last-round subkey to the top.</p>
             </div>
-            <button class="theme-toggle-btn" id="themeToggle" aria-label="Switch to light mode">🌙</button>
+            <aside class="cl-hero-why" aria-label="Why it matters">
+                <span class="cl-hero-why-label">WHY IT MATTERS</span>
+                <p class="cl-hero-why-text">Differential cryptanalysis broke DES-like ciphers far faster than brute force and rewrote how block ciphers are designed. Every modern S-box is chosen to flatten these biases — the reason AES and Serpent survive attacks that shattered their predecessors.</p>
+            </aside>
+            <button class="theme-toggle-btn" id="themeToggle" aria-label="Switch to light mode" hidden>🌙</button>
         </header>
 
         <nav class="tabs" role="tablist" aria-label="Demo sections">
