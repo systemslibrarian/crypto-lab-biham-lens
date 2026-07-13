@@ -19,6 +19,7 @@ import {
 } from './crypto/attack.js';
 import type { AttackResult } from './crypto/attack.js';
 import { seed as seedRng, getSeed as getRngSeed } from './crypto/rng.js';
+import { getPermutation } from './crypto/permutation.js';
 
 // ============================================================================
 // Application State
@@ -69,6 +70,9 @@ function initializeApp() {
   rebuildTrace();
   renderTracePipeline();
   showTimelineContent(0);
+  // Ground the attack's target Δ in the real cipher on first load so the
+  // default value is a derived characteristic, not an opaque magic constant.
+  deriveCharacteristicFromCipher(true);
 }
 
 function byId<T extends HTMLElement>(id: string): T {
@@ -136,7 +140,7 @@ function setupEventListeners() {
   p2Input.addEventListener('input', onPlaintextChange);
   outDiffInput.addEventListener('input', onOutDiffChange);
 
-  byId<HTMLButtonElement>('deriveDiff').addEventListener('click', deriveCharacteristicFromCipher);
+  byId<HTMLButtonElement>('deriveDiff').addEventListener('click', () => deriveCharacteristicFromCipher(false));
   byId<HTMLButtonElement>('add100').addEventListener('click', () => collectAndAddPairs(100));
   byId<HTMLButtonElement>('add500').addEventListener('click', () => collectAndAddPairs(500));
   byId<HTMLButtonElement>('add1000').addEventListener('click', () => collectAndAddPairs(1000));
@@ -151,6 +155,16 @@ function setupEventListeners() {
     gotoSbox.addEventListener('click', (e) => {
       e.preventDefault();
       switchTab('sbox');
+    });
+  }
+
+  const gotoTrace = document.getElementById('gotoTraceLink');
+  if (gotoTrace) {
+    gotoTrace.addEventListener('click', (e) => {
+      e.preventDefault();
+      switchTab('trace');
+      const panel = document.getElementById('trace');
+      if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   }
 
@@ -336,18 +350,27 @@ function hideResults() {
 // Empirical characteristic derivation
 // ============================================================================
 
-function deriveCharacteristicFromCipher() {
+function deriveCharacteristicFromCipher(auto = false) {
   const ranked = deriveCharacteristic(state.spnKey, state.selectedInputDiff, 4000);
   const best = ranked[0];
   state.selectedOutputDiff = best.outputDiff;
-  byId<HTMLInputElement>('outDiff').value = hex2(best.outputDiff);
+  const outDiffInput = byId<HTMLInputElement>('outDiff');
+  outDiffInput.value = hex2(best.outputDiff);
+
+  const pct = (best.probability * 100).toFixed(2);
+  // Annotate the field itself so the target Δ is never an unexplained
+  // magic constant: hovering explains where it comes from and why it works.
+  outDiffInput.title =
+    `0x${hex2(best.outputDiff)} is the peak difference reached just before round 4's S-box, ` +
+    `occurring ${pct}% of the time (chance is ~0.4%). That bias is what the attack detects.`;
 
   const second = ranked[1];
   const ratio = second ? (best.count / Math.max(second.count, 1)).toFixed(2) : '∞';
   byId('characteristicStatus').innerHTML =
-    `Sampled 4 000 pairs through 3 rounds. Peak Δ = ` +
+    (auto ? `Auto-derived on load: sampled ` : `Sampled `) +
+    `4 000 pairs through 3 rounds. Peak Δ = ` +
     `<span class="mono">0x${hex2(best.outputDiff)}</span> with probability ` +
-    `<strong>${(best.probability * 100).toFixed(2)}%</strong> ` +
+    `<strong>${pct}%</strong> ` +
     `(${ratio}× the runner-up). The attack will target this differential.`;
 }
 
@@ -737,7 +760,50 @@ function showDDTInfo(inputDiff: number, outputDiff: number, count: number) {
     useBtn.style.display = 'none';
   }
 
+  renderDDTLanes(inputDiff, outputDiff);
+
   lastDDTClick = { inputDiff, outputDiff, count };
+}
+
+/**
+ * Show how a single-nibble DDT differential sits inside the 8-bit byte the
+ * attack actually recovers. The byte has two 4-bit lanes (two copies of the
+ * same S-box); the 'use in attack' path drops the differential into the low
+ * lane, leaving the high lane's S-box inactive (Δ = 0). This makes the
+ * width mismatch between the DDT (one nibble) and K₄ (a byte) explicit.
+ */
+function renderDDTLanes(inputDiff: number, outputDiff: number) {
+  const host = document.getElementById('ddtLanes');
+  if (!host) return;
+  host.innerHTML = '';
+
+  const inHex = (inputDiff & 0xF).toString(16).toUpperCase();
+  const outHex = (outputDiff & 0xF).toString(16).toUpperCase();
+
+  const makeLane = (label: string, active: boolean, valHex: string, sub: string) => {
+    const lane = document.createElement('div');
+    lane.className = 'ddt-lane' + (active ? ' active' : ' idle');
+    const head = document.createElement('div');
+    head.className = 'ddt-lane-head';
+    head.textContent = label;
+    const val = document.createElement('div');
+    val.className = 'ddt-lane-val mono';
+    val.textContent = `Δ=0x${valHex}`;
+    const s = document.createElement('div');
+    s.className = 'ddt-lane-sub';
+    s.textContent = sub;
+    lane.appendChild(head);
+    lane.appendChild(val);
+    lane.appendChild(s);
+    return lane;
+  };
+
+  host.appendChild(
+    makeLane('High nibble (S-box copy #1)', false, '0', 'inactive — no difference to propagate'),
+  );
+  host.appendChild(
+    makeLane('Low nibble (S-box copy #2)', true, `${inHex}→${outHex}`, 'this is the clicked differential'),
+  );
 }
 
 function useDDTCellInAttack() {
@@ -780,15 +846,19 @@ function renderTracePipeline() {
   const container = byId('tracePipeline');
   container.innerHTML = '';
 
+  const currentIdx = state.traceVisibleCount - 1; // most recently revealed row
+
   state.traceStages.forEach((stage, idx) => {
     const prev = idx > 0 ? state.traceStages[idx - 1] : null;
     const diffChanged = prev !== null && prev.diff !== stage.diff;
     const visible = idx < state.traceVisibleCount;
+    const isCurrent = idx === currentIdx;
 
     const row = document.createElement('div');
     row.className = `trace-row kind-${stage.kind}` + (visible ? '' : ' hidden') +
-      (diffChanged ? ' diff-changed' : '');
+      (diffChanged ? ' diff-changed' : '') + (isCurrent && visible ? ' is-current' : '');
     row.setAttribute('role', 'listitem');
+    if (!visible) row.setAttribute('aria-hidden', 'true');
 
     // Stage label + tag.
     const labelCell = document.createElement('div');
@@ -842,12 +912,121 @@ function renderTracePipeline() {
     }
     row.appendChild(diffRow);
 
+    // Permute rows: draw the actual bit routing so "diffusion moves but does
+    // not create or destroy active bits" is visible, not inferred by eye.
+    if (stage.kind === 'permute' && prev && visible) {
+      row.appendChild(buildPermuteRouting(prev.diff, stage.diff, isCurrent));
+    }
+
     container.appendChild(row);
   });
 
   byId('traceStatus').textContent =
     `Stage ${state.traceVisibleCount - 1} of ${state.traceStages.length - 1} ` +
     `(${state.traceVisibleCount}/${state.traceStages.length} visible).`;
+}
+
+/**
+ * Build an SVG that draws where every bit of the permutation input lands in
+ * its output. Active source bits get a highlighted connector to their new
+ * position; the invariant (same number of active bits, new positions) is made
+ * concrete rather than left for the eye to verify across two static rows.
+ *
+ * Columns are MSB-first: bit b sits at column (7 - b), matching the diff-dot
+ * rows above. PERMUTATION[i] = j means source bit i routes to output bit j.
+ */
+function buildPermuteRouting(srcDiff: number, dstDiff: number, animate: boolean): HTMLElement {
+  const perm = getPermutation();
+  const wrap = document.createElement('div');
+  wrap.className = 'permute-routing';
+
+  const caption = document.createElement('p');
+  caption.className = 'permute-routing-caption';
+  const activeCount = popcount(srcDiff & 0xFF);
+  caption.innerHTML =
+    `Bit routing: <strong>${activeCount}</strong> active bit${activeCount === 1 ? '' : 's'} in, ` +
+    `<strong>${popcount(dstDiff & 0xFF)}</strong> out — permutation relocates without adding or removing.`;
+  wrap.appendChild(caption);
+
+  const NS = 'http://www.w3.org/2000/svg';
+  const cols = 8;
+  const colW = 34;
+  const padX = 18;
+  const width = padX * 2 + (cols - 1) * colW;
+  const height = 74;
+  const yTop = 14;
+  const yBot = height - 14;
+  const r = 6;
+
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  svg.setAttribute('width', String(width));
+  svg.setAttribute('height', String(height));
+  svg.setAttribute('role', 'img');
+  svg.setAttribute(
+    'aria-label',
+    `Permutation routing: input difference 0x${hex2(srcDiff)} with ${activeCount} active bits maps to ` +
+      `output difference 0x${hex2(dstDiff)} with the same number of active bits in new positions.`,
+  );
+
+  const colX = (col: number) => padX + col * colW;
+
+  // Connector lines first (under the dots). Only active source bits route.
+  let animOrder = 0;
+  for (let i = 0; i < 8; i++) {
+    const bit = (srcDiff >> i) & 1;
+    if (!bit) continue;
+    const j = perm[i];
+    const x1 = colX(7 - i);
+    const x2 = colX(7 - j);
+    const line = document.createElementNS(NS, 'line');
+    line.setAttribute('x1', String(x1));
+    line.setAttribute('y1', String(yTop));
+    line.setAttribute('x2', String(x2));
+    line.setAttribute('y2', String(yBot));
+    line.setAttribute('class', 'permute-wire');
+    if (animate) {
+      // Stagger the draw so each active bit's route is followed in turn.
+      line.style.animationDelay = `${animOrder * 0.18}s`;
+      line.classList.add('permute-wire-anim');
+      animOrder++;
+    }
+    svg.appendChild(line);
+  }
+
+  // Source (top) and destination (bottom) dots.
+  for (let col = 0; col < 8; col++) {
+    const bitIndex = 7 - col; // column 0 = bit 7
+    const srcActive = (srcDiff >> bitIndex) & 1;
+    const dstActive = (dstDiff >> bitIndex) & 1;
+
+    const top = document.createElementNS(NS, 'circle');
+    top.setAttribute('cx', String(colX(col)));
+    top.setAttribute('cy', String(yTop));
+    top.setAttribute('r', String(r));
+    top.setAttribute('class', `permute-dot ${srcActive ? 'active' : 'inactive'}`);
+    svg.appendChild(top);
+
+    const bot = document.createElementNS(NS, 'circle');
+    bot.setAttribute('cx', String(colX(col)));
+    bot.setAttribute('cy', String(yBot));
+    bot.setAttribute('r', String(r));
+    bot.setAttribute('class', `permute-dot ${dstActive ? 'active' : 'inactive'}`);
+    svg.appendChild(bot);
+  }
+
+  wrap.appendChild(svg);
+  return wrap;
+}
+
+function popcount(n: number): number {
+  let c = 0;
+  n &= 0xFF;
+  while (n) {
+    c += n & 1;
+    n >>= 1;
+  }
+  return c;
 }
 
 function traceStepForward() {
@@ -916,7 +1095,7 @@ const timelineContent = [
       <ul style="margin-left: 1rem; margin-top: 0.5rem;">
         <li>Secrets can be kept for decades (NSA knew differential cryptanalysis before DES was public)</li>
         <li>Mathematical insight outlasts secrecy — Biham & Shamir's work is permanent</li>
-        <li>Good cipher design survives attacks: DES, with its NSA-hardened S-boxes, resisted the Biham-Shamir attack that should have broken it</li>
+        <li>Good cipher design raises the cost: DES's NSA-hardened S-boxes pushed the Biham–Shamir attack to ~2⁴⁷ chosen-plaintext pairs — broken in theory, impractical in practice (16-round DES is attackable, just not affordably)</li>
         <li>Defense is possible but requires foresight: Serpent's ultra-conservative design ensures safety</li>
       </ul>
     `,

@@ -146,18 +146,76 @@
         </header>
 
         <nav class="tabs" role="tablist" aria-label="Demo sections">
-            <button class="tab-button active" data-tab="attack" role="tab" aria-selected="true" aria-controls="attack" id="tab-attack">Live Attack</button>
-            <button class="tab-button" data-tab="trace" role="tab" aria-selected="false" aria-controls="trace" id="tab-trace">Differential Trace</button>
-            <button class="tab-button" data-tab="sbox" role="tab" aria-selected="false" aria-controls="sbox" id="tab-sbox">S-box Analysis</button>
-            <button class="tab-button" data-tab="history" role="tab" aria-selected="false" aria-controls="history" id="tab-history">Historical Impact</button>
-            <button class="tab-button" data-tab="serpent" role="tab" aria-selected="false" aria-controls="serpent" id="tab-serpent">Why Serpent Survived</button>
+            <button class="tab-button active" data-tab="trace" role="tab" aria-selected="true" aria-controls="trace" id="tab-trace">1 · Differential Trace</button>
+            <button class="tab-button" data-tab="attack" role="tab" aria-selected="false" aria-controls="attack" id="tab-attack" tabindex="-1">2 · Live Attack</button>
+            <button class="tab-button" data-tab="sbox" role="tab" aria-selected="false" aria-controls="sbox" id="tab-sbox" tabindex="-1">S-box Analysis</button>
+            <button class="tab-button" data-tab="history" role="tab" aria-selected="false" aria-controls="history" id="tab-history" tabindex="-1">Historical Impact</button>
+            <button class="tab-button" data-tab="serpent" role="tab" aria-selected="false" aria-controls="serpent" id="tab-serpent" tabindex="-1">Why Serpent Survived</button>
         </nav>
 
         <main id="main-content">
-        <!-- TAB 1: Live Attack -->
-        <div id="attack" class="tab-content active" role="tabpanel" aria-labelledby="tab-attack" tabindex="0">
+        <!-- TAB 1: Differential Trace (build-up: watch a difference survive XOR-K and mutate at the S-box) -->
+        <div id="trace" class="tab-content active" role="tabpanel" aria-labelledby="tab-trace" tabindex="0">
+            <div class="tab-inner">
+                <h2>Differential Trace</h2>
+                <p class="tab-explanation">
+                    Start here. Two plaintexts P₁ and P₂ flow through every sub-stage of the cipher. The
+                    colored dots on each row are the XOR difference at that point. Watch the difference
+                    <em>not</em> change on XOR-K rows, get scrambled by S-box rows, and relocate on permute
+                    rows. Once you have seen a difference survive the key and mutate at the S-box, the
+                    <strong>Live Attack</strong> tab lets you exploit exactly that fact.
+                </p>
+
+                <aside class="insight-callout tight" aria-label="Reading the trace">
+                    <p>
+                        <strong>XOR-K rows preserve the difference</strong> exactly — that's the central
+                        invariant. <strong>S-box rows</strong> are the only place where the difference can
+                        change, and the DDT tells you how likely each transition is.
+                        <strong>Permute rows</strong> shuffle the active bits without changing how many —
+                        step onto one to see the routing animate.
+                    </p>
+                </aside>
+
+                <div class="trace-controls">
+                    <div class="form-group inline">
+                        <label for="traceP1">P₁:</label>
+                        <input type="text" id="traceP1" maxlength="2" class="hex-input">
+                        <label for="traceP2">P₂:</label>
+                        <input type="text" id="traceP2" maxlength="2" class="hex-input">
+                        <span class="muted">(shares with attack tab)</span>
+                    </div>
+                    <button id="traceStep" class="btn btn-primary">Step</button>
+                    <button id="traceShowAll" class="btn btn-secondary">Show all</button>
+                    <button id="traceReset" class="btn btn-secondary">Reset</button>
+                    <p id="traceStatus" class="status" aria-live="polite">Stage 0 of 11.</p>
+                </div>
+
+                <div class="trace-pipeline" id="tracePipeline" role="list" aria-label="Differential pipeline">
+                    <!-- populated by JS -->
+                </div>
+
+                <div class="stage-legend">
+                    <div class="legend-item"><span class="bit active"></span> active bit</div>
+                    <div class="legend-item"><span class="bit inactive"></span> inactive bit</div>
+                    <div class="legend-item"><span class="stage-tag xor-key">XOR-K</span> preserves Δ</div>
+                    <div class="legend-item"><span class="stage-tag sbox">S-box</span> can change Δ</div>
+                    <div class="legend-item"><span class="stage-tag permute">Permute</span> relocates Δ</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: Live Attack -->
+        <div id="attack" class="tab-content" role="tabpanel" aria-labelledby="tab-attack" tabindex="0">
             <div class="tab-inner">
                 <h2>Live Differential Attack</h2>
+                <div class="start-here-banner" role="note">
+                    <span class="start-here-icon" aria-hidden="true">◀</span>
+                    <p><strong>New here?</strong> This tab is the payoff. The intuition it relies on —
+                        <em>a difference survives the key XOR and only the S-box can change it</em> — is built
+                        step by step in the <button type="button" class="link-btn" id="gotoTraceLink">Differential
+                        Trace</button> tab. Watch a difference propagate there first, then come back and exploit
+                        that bias here.</p>
+                </div>
                 <p class="tab-explanation">
                     A real chosen-plaintext differential attack on the 4-round toy SPN cipher: we exploit a
                     high-probability differential to recover the last round subkey.
@@ -217,14 +275,17 @@
                         <p class="muted">
                             We attack the last round by guessing K₄, partially decrypting, and counting
                             how many pairs hit the difference we expect <em>just before</em> the last S-box.
+                            A <em>3-round characteristic</em> is simply the difference that reliably survives
+                            the first three rounds — the peak of the propagation you watched in the Trace tab.
                         </p>
                         <div class="form-group">
                             <label for="outDiff">Expected Δ before last S-box (hex):</label>
                             <input type="text" id="outDiff" value="0B" maxlength="2" class="hex-input">
                         </div>
-                        <button id="deriveDiff" class="btn btn-secondary">Derive empirically from cipher</button>
+                        <button id="deriveDiff" class="btn btn-secondary">Re-derive empirically from cipher</button>
                         <p id="characteristicStatus" class="status" aria-live="polite">
-                            Click <em>derive</em> to sample the cipher and find the peak 3-round differential.
+                            This value is auto-derived on load by sampling the cipher. Hover the field to see
+                            where it comes from, or click <em>re-derive</em> to re-sample.
                         </p>
                     </div>
 
@@ -251,18 +312,22 @@
                         <div class="result-card">
                             <div class="result-label">Recovered Key</div>
                             <div class="result-value mono" id="recoveredKey">0x00</div>
+                            <p class="result-note">The highest-bias candidate — our guess for K₄.</p>
                         </div>
                         <div class="result-card">
                             <div class="result-label">Rank of Correct Key</div>
                             <div class="result-value mono" id="correctKeyRank">—</div>
+                            <p class="result-note"><strong>Lower is better.</strong> Rank 1 = the attack put the true key on top.</p>
                         </div>
                         <div class="result-card">
                             <div class="result-label">Bias of Top Candidate</div>
                             <div class="result-value mono" id="topBias">—</div>
+                            <p class="result-note">How many pairs hit the target Δ. Well above chance (pairs ÷ 16) signals the right key.</p>
                         </div>
                         <div class="result-card">
                             <div class="result-label">Margin over runner-up</div>
                             <div class="result-value mono" id="biasMargin">—</div>
+                            <p class="result-note"><strong>Bigger is better.</strong> Gap between #1 and #2 — a large margin means the winner is unambiguous.</p>
                         </div>
                     </div>
 
@@ -332,53 +397,6 @@
             </div>
         </div>
 
-        <!-- TAB 2: Differential Trace -->
-        <div id="trace" class="tab-content" role="tabpanel" aria-labelledby="tab-trace" tabindex="0">
-            <div class="tab-inner">
-                <h2>Differential Trace</h2>
-                <p class="tab-explanation">
-                    Two plaintexts P₁ and P₂ flow through every sub-stage of the cipher. The colored bar on
-                    each row is the XOR difference at that point. Watch the difference <em>not</em> change
-                    on XOR-K rows, get scrambled by S-box rows, and relocate on permute rows.
-                </p>
-
-                <aside class="insight-callout tight" aria-label="Reading the trace">
-                    <p>
-                        <strong>XOR-K rows preserve the difference</strong> exactly — that's the central
-                        invariant. <strong>S-box rows</strong> are the only place where the difference can
-                        change, and the DDT tells you how likely each transition is.
-                        <strong>Permute rows</strong> shuffle the active bits without changing how many.
-                    </p>
-                </aside>
-
-                <div class="trace-controls">
-                    <div class="form-group inline">
-                        <label for="traceP1">P₁:</label>
-                        <input type="text" id="traceP1" maxlength="2" class="hex-input">
-                        <label for="traceP2">P₂:</label>
-                        <input type="text" id="traceP2" maxlength="2" class="hex-input">
-                        <span class="muted">(shares with attack tab)</span>
-                    </div>
-                    <button id="traceStep" class="btn btn-primary">Step</button>
-                    <button id="traceShowAll" class="btn btn-secondary">Show all</button>
-                    <button id="traceReset" class="btn btn-secondary">Reset</button>
-                    <p id="traceStatus" class="status" aria-live="polite">Stage 0 of 11.</p>
-                </div>
-
-                <div class="trace-pipeline" id="tracePipeline" role="list" aria-label="Differential pipeline">
-                    <!-- populated by JS -->
-                </div>
-
-                <div class="stage-legend">
-                    <div class="legend-item"><span class="bit active"></span> active bit</div>
-                    <div class="legend-item"><span class="bit inactive"></span> inactive bit</div>
-                    <div class="legend-item"><span class="stage-tag xor-key">XOR-K</span> preserves Δ</div>
-                    <div class="legend-item"><span class="stage-tag sbox">S-box</span> can change Δ</div>
-                    <div class="legend-item"><span class="stage-tag permute">Permute</span> relocates Δ</div>
-                </div>
-            </div>
-        </div>
-
         <!-- TAB 3: S-box Analysis -->
         <div id="sbox" class="tab-content" role="tabpanel" aria-labelledby="tab-sbox" tabindex="0">
             <div class="tab-inner">
@@ -417,6 +435,16 @@
                             <p><strong>Count:</strong> <span id="ddtCount">0</span> out of 16 input pairs</p>
                             <p><strong>Probability:</strong> <span id="ddtProb">0%</span></p>
                             <p id="ddtExploitable"></p>
+                            <div id="ddtLanes" class="ddt-lanes" aria-hidden="true">
+                                <!-- populated by JS: shows how this single-nibble differential
+                                     sits inside the 8-bit byte the attack recovers -->
+                            </div>
+                            <p class="ddt-lanes-note muted">
+                                The DDT above describes <strong>one 4-bit S-box</strong>. The attack recovers the
+                                full <strong>8-bit</strong> last-round subkey K₄, which covers <strong>two</strong>
+                                copies of this S-box (high and low nibble). Placing your differential in the low
+                                nibble leaves the high-nibble S-box inactive (Δ = 0).
+                            </p>
                             <button id="useInAttack" class="btn btn-primary" style="display: none;">
                                 Use this differential in the attack →
                             </button>

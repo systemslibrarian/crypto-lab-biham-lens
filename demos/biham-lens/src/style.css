@@ -421,6 +421,13 @@ h4 {
   font-family: var(--mono);
 }
 
+.result-note {
+  margin-top: 0.6rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
 /* Chart Canvas */
 #biasChart {
   width: 100%;
@@ -494,6 +501,37 @@ h4 {
 .insight-callout.tight {
   padding: 0.9rem 1.2rem;
   margin: 1rem 0 1.5rem;
+}
+
+/* "New here? Start with the Trace" onboarding banner on the Attack tab. */
+.start-here-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  background: var(--accent-primary-bg);
+  border: 1px solid var(--accent-primary-border);
+  border-left: 4px solid var(--accent-secondary);
+  border-radius: 4px;
+  padding: 0.9rem 1.1rem;
+  margin: 0.75rem 0 1.25rem;
+}
+
+.start-here-banner .start-here-icon {
+  color: var(--accent-secondary);
+  font-size: 1.1rem;
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+
+.start-here-banner p {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.start-here-banner .link-btn {
+  font-size: inherit;
+  margin-left: 0;
 }
 
 /* Setup row (S-box + seed cards above the attack steps) */
@@ -722,8 +760,16 @@ h4 {
   transition: opacity 0.2s ease, border-color 0.2s ease;
 }
 
+/* Not-yet-revealed rows show as a faint skeleton (border/background only).
+   Their text is hidden from rendering and the a11y tree so low-opacity text
+   never trips the contrast gate — the pipeline reveals content as you step. */
 .trace-row.hidden {
-  opacity: 0.15;
+  opacity: 0.35;
+  background-color: transparent;
+}
+
+.trace-row.hidden > * {
+  visibility: hidden;
 }
 
 .trace-row.kind-sbox {
@@ -813,6 +859,70 @@ h4 {
   font-size: 0.7rem;
   color: var(--danger);
   margin-left: 0.4rem;
+}
+
+/* Permutation bit-routing animation (permute rows only). Spans the whole row
+   under the 4-column grid. */
+.permute-routing {
+  grid-column: 1 / -1;
+  margin-top: 0.5rem;
+  padding-top: 0.6rem;
+  border-top: 1px dashed var(--border-light);
+}
+
+.permute-routing-caption {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.3rem;
+}
+
+.permute-routing svg {
+  display: block;
+  max-width: 100%;
+}
+
+.permute-dot {
+  stroke: var(--border-light);
+  stroke-width: 1;
+}
+
+.permute-dot.active {
+  fill: var(--danger);
+}
+
+.permute-dot.inactive {
+  fill: var(--bg-tertiary);
+}
+
+.permute-wire {
+  stroke: var(--accent-secondary);
+  stroke-width: 2;
+  fill: none;
+  opacity: 0.85;
+}
+
+/* When a permute row is the freshly-stepped-onto row, draw each active bit's
+   route in turn so the relocation is followed, not just seen. */
+.permute-wire-anim {
+  stroke-dasharray: 90;
+  stroke-dashoffset: 90;
+  animation: permute-draw 0.45s ease forwards;
+}
+
+@keyframes permute-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .permute-wire-anim {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
+
+.trace-row.is-current {
+  border-color: var(--accent-tertiary);
+  box-shadow: 0 0 0 1px var(--accent-tertiary) inset;
 }
 
 .trace-stages {
@@ -954,6 +1064,60 @@ h4 {
   font-size: 0.85rem;
   color: var(--text-secondary);
   margin-bottom: 1rem;
+}
+
+/* Two 4-bit lanes: shows how a single-nibble DDT differential sits inside the
+   8-bit byte the attack recovers (one active lane, one idle lane). */
+.ddt-lanes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+  margin: 0.75rem 0 0.5rem;
+}
+
+.ddt-lane {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.6rem 0.7rem;
+  background-color: var(--bg-tertiary);
+}
+
+.ddt-lane.active {
+  border-color: var(--danger);
+  border-left: 4px solid var(--danger);
+}
+
+.ddt-lane.idle {
+  opacity: 0.75;
+  border-left: 4px solid var(--border-light);
+}
+
+.ddt-lane-head {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-secondary);
+  margin-bottom: 0.35rem;
+}
+
+.ddt-lane-val {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.ddt-lane.active .ddt-lane-val {
+  color: var(--danger);
+}
+
+.ddt-lane-sub {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  margin-top: 0.3rem;
+}
+
+.ddt-lanes-note {
+  font-size: 0.82rem;
+  margin-bottom: 0.75rem;
 }
 
 .ddt-grid {
