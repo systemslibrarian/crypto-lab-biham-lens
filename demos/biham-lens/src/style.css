@@ -21,6 +21,12 @@
   --accent-primary-border: rgba(255, 59, 92, 0.3);
 
   --border: #2a2a3e;
+  /* Control boundaries only (form/hex inputs, clickable timeline steps, theme
+     toggle). Those controls are filled with --bg-tertiary / --bg-secondary, which
+     sit at 1.08-1.17:1 against the surface behind them, so the border is the sole
+     boundary and WCAG 2.1 SC 1.4.11 requires 3:1. --border and --border-light
+     stay as-is for decorative rules (section outlines, tables, cards). */
+  --border-strong: #71719f;
   --border-light: #3a3a4e;
 
   --success: #00d86f;
@@ -55,6 +61,7 @@
   --accent-tertiary-hover: #00546a;
 
   --border: #d5d5e0;
+  --border-strong: #8282a3;
   --border-light: #e0e0eb;
 
   --success: #166534;
@@ -139,7 +146,7 @@ body {
   width: 2.6rem;
   height: 2.6rem;
   border-radius: 50%;
-  border: 1px solid var(--border-light);
+  border: 1px solid var(--border-strong);
   background-color: var(--bg-secondary);
   color: var(--text-primary);
   font-size: 1.3rem;
@@ -297,7 +304,7 @@ h4 {
   width: 100%;
   padding: 0.6rem;
   background-color: var(--bg-tertiary);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: 4px;
   color: var(--text-primary);
   font-family: var(--mono);
@@ -322,7 +329,7 @@ h4 {
   width: 100%;
   padding: 0.6rem;
   background-color: var(--bg-tertiary);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: 4px;
   color: var(--text-primary);
   font-family: var(--mono);
@@ -1227,7 +1234,7 @@ h4 {
 
 .timeline-step {
   background-color: var(--bg-tertiary);
-  border: 2px solid var(--border);
+  border: 2px solid var(--border-strong);
   border-radius: 4px;
   padding: 0.8rem 1rem;
   cursor: pointer;
