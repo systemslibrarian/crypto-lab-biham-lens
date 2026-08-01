@@ -82,7 +82,12 @@ export function attackLastRound(
   expectedOutputDiff: number,
 ): AttackResult[] {
   const results: AttackResult[] = [];
-  const expectedRandomCount = (pairs.length / 16) * 1; // Random: each nibble has ~1/16 chance
+  // The target difference is a full BYTE, not a nibble, so at a wrong key guess
+  // the partially-decrypted difference lands on it about 1 time in 256 — not 1
+  // in 16. Measured on this cipher: 500 pairs gives a wrong-key mean of ~2-3
+  // hits, i.e. ~500/256, against ~25 hits for the correct key. Using /16 here
+  // would put the noise floor (31) ABOVE the real signal (25).
+  const expectedRandomCount = pairs.length / 256;
 
   // Try all 256 possible values for the last round subkey
   for (let candidateKey = 0; candidateKey < 256; candidateKey++) {
@@ -176,7 +181,7 @@ export function performAttack(
 
   return {
     totalPairs: pairCount,
-    expectedRandomCount: (pairCount / 16) * 1,
+    expectedRandomCount: pairCount / 256,
     results,
     correctKeyRank,
     correctKeyBias: results[0].biasCount, // Get bias of best candidate

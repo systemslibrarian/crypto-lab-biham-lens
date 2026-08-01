@@ -1052,10 +1052,10 @@ function traceResetClick() {
 
 const timelineContent = [
   {
-    title: '1970s — NSA\'s Classified Secret',
+    title: '1970s — A Classified Design Criterion',
     content: `
-      <p>In the 1970s, the NSA recognized that the DES S-boxes had hidden vulnerabilities to differential attacks—techniques the NSA knew about but kept classified. The S-boxes were hardened specifically to resist differential cryptanalysis, though this fact remained secret.</p>
-      <p>The design decisions appeared arbitrary to public cryptanalysts for nearly two decades, but they were actually countermeasures against attacks that wouldn't be discovered publicly until the 1990s.</p>
+      <p>DES was designed by an IBM team around 1974. That team already knew the attack — they called it the "T attack" — and chose the S-boxes and the permutation specifically to resist it. Don Coppersmith, who did that work, later wrote that he "participated in the design and test of DES, particularly in the design of the S-boxes and in strengthening them against differential cryptanalysis."</p>
+      <p>The NSA's contribution was to require that the reasoning stay classified, not to write the tables. Either way the effect was the same: the design decisions looked arbitrary to public cryptanalysts for nearly two decades, because they were countermeasures against an attack that would not be published until 1990.</p>
     `,
   },
   {
@@ -1063,15 +1063,15 @@ const timelineContent = [
     content: `
       <p>In 1990, Eli Biham and Adi Shamir published the paper that introduced differential cryptanalysis to the world (CRYPTO '90):</p>
       <p><strong>"Differential Cryptanalysis of DES-like Cryptosystems"</strong> (Journal of Cryptology, 1991)</p>
-      <p>This was a watershed moment. Suddenly, the NSA's decades of secret knowledge became public. The 16-round DES, which was thought to be secure for another 20 years, could theoretically be broken with 2^47 chosen plaintexts instead of the full 2^56 brute force.</p>
+      <p>This was a watershed moment: a design criterion that had been held privately for fifteen years became public. This first paper broke DES reduced to 15 rounds; the full 16 rounds still resisted it. The famous 2⁴⁷-chosen-plaintext attack on all 16 rounds came two years later, in "Differential Cryptanalysis of the Full 16-Round DES" (CRYPTO '92) — better than the 2⁵⁶ of exhaustive key search, but needing 2⁴⁷ chosen plaintexts, which no real target would ever supply.</p>
     `,
   },
   {
-    title: '1994 — Coppersmith Confirms NSA Foresight',
+    title: '1994 — Coppersmith Explains the S-boxes',
     content: `
-      <p>Don Coppersmith of IBM published a paper revealing that the NSA had classified differential cryptanalysis in the 1970s and deliberately hardened DES against it.</p>
-      <p>The NSA's foresight—building defenses against attacks that existed only in secret—became public validation. The DES S-boxes were not weak; they were prescient.</p>
-      <p>This vindicated NSA design decisions that had seemed arbitrary in the 1970s.</p>
+      <p>Don Coppersmith published "The Data Encryption Standard (DES) and its strength against attacks" (IBM Journal of Research and Development 38(3), 1994), stating that he had been on the IBM design team and had strengthened the S-boxes against differential cryptanalysis while designing them.</p>
+      <p>He showed the specific safeguards built in from the beginning, and put the resulting cost of the attack at more than 10¹⁵ bytes of chosen plaintext.</p>
+      <p>The DES S-boxes were not weak, and they were not lucky. They were chosen against an attack the designers already understood and were not permitted to describe.</p>
     `,
   },
   {
@@ -1093,9 +1093,9 @@ const timelineContent = [
       <p>Differential cryptanalysis remains one of the most important applications of statistical methods to cryptanalysis. Every modern block cipher is designed with differential attacks in mind.</p>
       <p><strong>Key lessons:</strong></p>
       <ul style="margin-left: 1rem; margin-top: 0.5rem;">
-        <li>Secrets can be kept for decades (NSA knew differential cryptanalysis before DES was public)</li>
+        <li>Secrets can be kept for decades (IBM's designers knew differential cryptanalysis before DES was published, and were required to stay quiet about it)</li>
         <li>Mathematical insight outlasts secrecy — Biham & Shamir's work is permanent</li>
-        <li>Good cipher design raises the cost: DES's NSA-hardened S-boxes pushed the Biham–Shamir attack to ~2⁴⁷ chosen-plaintext pairs — broken in theory, impractical in practice (16-round DES is attackable, just not affordably)</li>
+        <li>Good cipher design raises the cost: the hardened S-boxes pushed the Biham–Shamir attack on full DES to ~2⁴⁷ chosen plaintexts — broken in theory, impractical in practice (16-round DES is attackable, just not affordably)</li>
         <li>Defense is possible but requires foresight: Serpent's ultra-conservative design ensures safety</li>
       </ul>
     `,
