@@ -13,11 +13,6 @@
     <link rel="stylesheet" href="/src/style.css" />
 </head>
 <body>
-<!-- BEGIN crypto-lab shared header — managed; edit shared-header.html + re-run reapply-header.py
-     Identical on every lab. Self-contained styles. Accents use each demo's own
-     --accent CSS variable (teal #35d6bb fallback). The ONLY per-repo value is the
-     repo name (crypto-lab-biham-lens) in the GitHub link.
-     Source of truth: github.com/systemslibrarian/crypto-lab/shared-header.html -->
 <style>
   .cl-topbar{
     /* The bar is always dark (#0b1512) regardless of page theme, so header
@@ -129,7 +124,6 @@
     else dedupeBanner();
   })();
 </script>
-<!-- END crypto-lab shared header -->
     <a href="#main-content" class="skip-link">Skip to main content</a>
     <div id="app">
         <header class="cl-hero">
@@ -222,7 +216,7 @@
                 </p>
 
                 <aside class="insight-callout" aria-label="Core insight">
-                    <h4>Why XOR differences? The core insight</h4>
+                    <h3>Why XOR differences? The core insight</h3>
                     <p>
                         For any two plaintexts P₁, P₂ and any round key K:
                         <span class="mono">(P₁ ⊕ K) ⊕ (P₂ ⊕ K) = P₁ ⊕ P₂</span>
@@ -236,7 +230,7 @@
 
                 <div class="setup-row">
                     <div class="setup-card">
-                        <h4>Cipher setup</h4>
+                        <h3>Cipher setup</h3>
                         <p>Active S-box: <span id="activeSboxLabel" class="mono">Weak (toy)</span>
                             <a href="#sbox" id="gotoSboxLink" class="inline-link">change →</a></p>
                         <p>Master key K: <span class="mono" id="masterKeyDisplay">0x5A69</span></p>
@@ -244,7 +238,7 @@
                             <button id="revealK4" class="link-btn" type="button">reveal</button></p>
                     </div>
                     <div class="setup-card">
-                        <h4>Reproducibility</h4>
+                        <h3>Reproducibility</h3>
                         <div class="form-group inline">
                             <label for="seedInput">PRNG seed (hex):</label>
                             <input type="text" id="seedInput" value="12345678" maxlength="8" class="hex-input">

@@ -118,7 +118,6 @@ body {
   flex-direction: column;
 }
 
-/* BEGIN cl-hero standard — managed, keep in sync across fleet */
 /* Local vars map the fleet tokens onto this demo's theme:
    --text -> --text-primary, --text-dim -> --text-secondary,
    --accent -> --accent-tertiary (cyan data accent, AA in both themes). */
@@ -130,8 +129,7 @@ body {
 .cl-hero-why{flex:0 1 min(40%,26rem);min-width:min(100%,15rem);border:1px solid var(--border);border-radius:10px;padding:.85rem 1.05rem;background:color-mix(in oklab,var(--accent-tertiary) 6%,transparent);}
 .cl-hero-why-label{display:block;font-size:.68rem;font-weight:700;letter-spacing:.14em;color:var(--accent-tertiary);}
 .cl-hero-why-text{margin:.35rem 0 0;font-size:.95rem;line-height:1.5;color:var(--text-primary);}
-@media (max-width:640px){.cl-hero{flex-direction:column;}.cl-hero-why{flex-basis:auto;width:100%;}}
-/* END cl-hero standard */
+@media (max-width:640px){.cl-hero{flex-direction:column;}.cl-hero-why{flex-basis:auto;width:100%;}.cl-hero-main{flex-basis:auto;min-width:0;}}
 
 /* Theme Toggle Button */
 .theme-toggle-btn {
@@ -312,6 +310,14 @@ h4 {
   border-color: var(--accent-primary);
 }
 
+/* The border-colour change above is not a sufficient focus indicator on its own
+   and it out-specifies the global `*:focus-visible` ring, so restore the ring
+   for keyboard focus. */
+.form-group input:focus-visible {
+  outline: 3px solid var(--accent-tertiary);
+  outline-offset: 2px;
+}
+
 .hex-input {
   width: 100%;
   padding: 0.6rem;
@@ -483,7 +489,10 @@ h4 {
   margin: 1.5rem 0 2rem;
 }
 
-.insight-callout h4 {
+/* Promoted from h4 to h3 so the heading order in this section does not skip a
+   level (WCAG 1.3.1); the visual size is kept at the old h4 scale. */
+.insight-callout h3 {
+  font-size: 1rem;
   color: var(--accent-tertiary);
   margin-bottom: 0.6rem;
 }
@@ -549,7 +558,8 @@ h4 {
   padding: 1rem 1.2rem;
 }
 
-.setup-card h4 {
+/* Promoted from h4 to h3 (see .insight-callout h3) — visual scale unchanged. */
+.setup-card h3 {
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
