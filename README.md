@@ -25,7 +25,7 @@ The interactive browser demo lets you collect ciphertext pairs from a toy 4-roun
 
 Real failure modes and pitfalls in differential cryptanalysis and its defense:
 
-- **Weak S-box selection**: DES's S-boxes were hardened against differential attacks in secret by the NSA in the 1970s; many S-box designs without this care exhibit high-probability differentials, allowing attacks with fewer than 500 pairs. The max DDT entry of DES is 8, while poorly designed S-boxes can have DDT entries of 12 or more.
+- **Weak S-box selection**: DES's S-boxes were hardened against differential attacks in secret by the NSA in the 1970s; many S-box designs without this care exhibit high-probability differentials, allowing attacks with fewer than 500 pairs. The largest DDT entry across DES's 6→4-bit S-boxes is 16 out of 64 (a differential probability of 1/4); the toy 4-bit S-box in this demo peaks at 8 out of 16 (1/2), while the PRESENT S-box it can be swapped for peaks at 4 out of 16 (1/4), the best a 4-bit permutation can do.
 - **Insufficient rounds**: Each round of proper diffusion increases the minimum number of pairs required exponentially; DES with only 8 rounds is breakable by differential attacks in hours, while full 16-round DES requires impractically many pairs. Serpent uses 32 rounds specifically to guarantee immunity.
 - **Biased round key schedule**: If the round subkeys are derived deterministically from a master key with low entropy or poor diffusion, recovering one subkey may leak information about others, amplifying the attack. The attack assumes subkeys are independent for each round.
 - **Implementation padding and oracle feedback**: If the target cipher implementation returns detailed error information (e.g., "decryption failed at S-box stage 2"), an attacker can narrow the search before the cryptanalysis step, reducing pairs needed further. Constant-time implementations resist such leakage.
@@ -35,7 +35,7 @@ Real failure modes and pitfalls in differential cryptanalysis and its defense:
 
 Systems and standards that must resist differential cryptanalysis or use concepts derived from it:
 
-- **DES (1977)**: The NSA hardened DES's S-boxes in secret to resist differential attacks; this was confirmed only in 1993 by Don Coppersmith, decades after Biham and Shamir's public discovery. Modern software implementations are still used for legacy compatibility, making them targets for differential attacks on reduced-round variants.
+- **DES (1977)**: The NSA hardened DES's S-boxes in secret to resist differential attacks; this was confirmed only in 1994 by Don Coppersmith, four years after Biham and Shamir's public discovery. Modern software implementations are still used for legacy compatibility, making them targets for differential attacks on reduced-round variants.
 - **SERPENT cipher (1998)**: Co-designed by Eli Biham himself, Serpent uses 32 rounds (extreme redundancy) and carefully selected S-boxes to be provably immune to differential cryptanalysis even if the attacker has access to all round subkeys. It lost the AES competition to Rijndael but remains a reference design for differential-resistant ciphers.
 - **Advanced Encryption Standard (AES / Rijndael, 2001)**: The winning AES design includes a strong S-box with minimal DDT entries (max 4) and multiple diffusion layers (MixColumns) per round to guarantee that differential characteristics cannot reach the final round with practical probability over 10 rounds of encryption.
 - **SPECK and SIMON (NSA, 2013)**: These lightweight block ciphers for IoT devices are analyzed extensively for differential properties; the NSA's published security arguments include differential cryptanalysis proofs, confirming that round counts and S-box properties provide resistance.
@@ -59,5 +59,7 @@ npm run dev
 - [crypto-lab-enigma-forge](https://systemslibrarian.github.io/crypto-lab-enigma-forge/) — Enigma and the Bombe, a historical cryptanalysis story.
 
 ---
+
+*One of 170+ browser demos in the [Crypto Lab](https://crypto-lab.systemslibrarian.dev/) suite.*
 
 *"So whether you eat or drink or whatever you do, do it all for the glory of God." — 1 Corinthians 10:31*

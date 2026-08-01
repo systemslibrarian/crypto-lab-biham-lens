@@ -1061,13 +1061,13 @@ const timelineContent = [
   {
     title: '1990 — Biham & Shamir\'s Discovery',
     content: `
-      <p>On June 18, 1990, Eli Biham and Adi Shamir published their paper introducing differential cryptanalysis to the world:</p>
+      <p>In 1990, Eli Biham and Adi Shamir published the paper that introduced differential cryptanalysis to the world (CRYPTO '90):</p>
       <p><strong>"Differential Cryptanalysis of DES-like Cryptosystems"</strong> (Journal of Cryptology, 1991)</p>
-      <p>This was a watershed moment. Suddenly, the NSA's decades of secret knowledge became public. The 16-round DES, which was thought to be secure for another 20 years, could theoretically be broken in 2^48 operations instead of the full 2^56 brute force.</p>
+      <p>This was a watershed moment. Suddenly, the NSA's decades of secret knowledge became public. The 16-round DES, which was thought to be secure for another 20 years, could theoretically be broken with 2^47 chosen plaintexts instead of the full 2^56 brute force.</p>
     `,
   },
   {
-    title: '1993 — Coppersmith Confirms NSA Foresight',
+    title: '1994 — Coppersmith Confirms NSA Foresight',
     content: `
       <p>Don Coppersmith of IBM published a paper revealing that the NSA had classified differential cryptanalysis in the 1970s and deliberately hardened DES against it.</p>
       <p>The NSA's foresight—building defenses against attacks that existed only in secret—became public validation. The DES S-boxes were not weak; they were prescient.</p>
