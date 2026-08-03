@@ -434,9 +434,12 @@ function showAttackResults(results: AttackResult[]) {
 
 function updateOpCounter() {
   byId('opCount').textContent = state.lastOpCount.toLocaleString();
-  // Toy "differential cost" = candidate count × pairs.
+  // Toy "differential cost" = 2 partial decryptions (one per ciphertext in the
+  // pair) × 256 candidate subkeys × pairs. The leading 2 has to be written out:
+  // `lastOpCount` counts partial decryptions, so a `256 × pairs` label rendered
+  // an equation that did not hold (256 × 500 = 256,000 is false by a factor of 2).
   byId('diffToy').textContent =
-    `256 × ${state.collectedPairs.length} = ${state.lastOpCount.toLocaleString()}`;
+    `2 × 256 × ${state.collectedPairs.length} = ${state.lastOpCount.toLocaleString()}`;
 }
 
 // ============================================================================
