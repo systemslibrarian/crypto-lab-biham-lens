@@ -34,18 +34,76 @@ async function openAllDetails(page: Page): Promise<void> {
  * the compositor to agree, so axe samples final colours rather than tween frames.
  */
 async function settle(page: Page): Promise<void> {
-  await page.addStyleTag({
-    content: `*,*::before,*::after{
-      animation-duration:0s!important;animation-delay:0s!important;
-      transition-duration:0s!important;transition-delay:0s!important;
-      scroll-behavior:auto!important;
-    }`,
-  });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.evaluate(async () => {
     await Promise.all(
       document.getAnimations().map((a) => a.finished.catch(() => undefined)),
     );
   });
+  await expect(page.locator('h1')).toBeVisible();
+}
+
+async function checkGradientContrast(page: Page, selector: string) {
+  const ratio = await page.evaluate((sel) => {
+    function getLuminance(r: number, g: number, b: number) {
+      const a = [r, g, b].map(function (v) {
+        v /= 255;
+        return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+      });
+      return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
+    }
+    const els = document.querySelectorAll(sel);
+    if (els.length === 0) return 100;
+    let minGlobalRatio = Infinity;
+
+    for (const el of Array.from(els)) {
+      const style = window.getComputedStyle(el);
+      const textMatch = style.color.match(/\d+/g);
+      if (!textMatch) continue;
+      const [r1, g1, b1] = textMatch.map(Number);
+      const l1 = getLuminance(r1, g1, b1);
+
+      // get nearest parent with a background gradient
+      let parent = el;
+      let bgStr = '';
+      while (parent) {
+        bgStr = window.getComputedStyle(parent).backgroundImage;
+        if (bgStr && bgStr !== 'none') break;
+        parent = parent.parentElement;
+      }
+      
+      if (!bgStr) continue;
+      const bgMatches = Array.from(bgStr.matchAll(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?/g));
+      if (bgMatches.length === 0) continue;
+
+      const bodyBgMatch = window.getComputedStyle(document.body).backgroundColor.match(/\d+/g) || [0,0,0];
+      const [br, bg, bb] = bodyBgMatch.map(Number);
+
+      let minRatio = Infinity;
+      for (const match of bgMatches) {
+        let r2 = parseInt(match[1], 10);
+        let g2 = parseInt(match[2], 10);
+        let b2 = parseInt(match[3], 10);
+        let a = match[4] ? parseFloat(match[4]) : 1;
+        
+        r2 = Math.round(r2 * a + br * (1 - a));
+        g2 = Math.round(g2 * a + bg * (1 - a));
+        b2 = Math.round(b2 * a + bb * (1 - a));
+
+        const l2 = getLuminance(r2, g2, b2);
+        const lightest = Math.max(l1, l2);
+        const darkest = Math.min(l1, l2);
+        const cr = (lightest + 0.05) / (darkest + 0.05);
+        if (cr < minRatio) minRatio = cr;
+      }
+      if (minRatio < minGlobalRatio) minGlobalRatio = minRatio;
+    }
+    return minGlobalRatio;
+  }, selector);
+  
+  if (ratio !== 100) {
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
+  }
 }
 
 async function scan(page: Page): Promise<void> {
@@ -63,6 +121,7 @@ async function scan(page: Page): Promise<void> {
 test('no WCAG A/AA violations in dark theme', async ({ page }) => {
   await page.goto('.');
   await openAllDetails(page);
+  await checkGradientContrast(page, '.insight-callout p, .success-card p, .failure-card p');
   await scan(page);
 });
 
@@ -71,5 +130,6 @@ test('no WCAG A/AA violations in light theme', async ({ page }) => {
   await page.locator('#cl-theme-toggle').click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   await openAllDetails(page);
+  await checkGradientContrast(page, '.insight-callout p, .success-card p, .failure-card p');
   await scan(page);
 });
