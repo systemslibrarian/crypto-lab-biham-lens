@@ -658,7 +658,15 @@ function renderSBox() {
   for (let i = 0; i < 16; i++) {
     const cell = document.createElement('div');
     cell.className = 'sbox-cell';
-    cell.setAttribute('role', 'gridcell');
+    // NOT `gridcell`: a `gridcell` is only valid inside a `row` inside a
+    // `grid`, and this container has no row layer — axe reports it as two
+    // critical failures (`aria-required-children` on the container,
+    // `aria-required-parent` on every cell) and a screen reader gets a
+    // malformed grid. `img` is valid anywhere, permits an accessible name, and
+    // replaces the bare hex digit with the full "input -> output" reading,
+    // which is what the label was for. (A plain div would put the name on the
+    // generic role, where aria-label is PROHIBITED and silently discarded.)
+    cell.setAttribute('role', 'img');
     cell.setAttribute(
       'aria-label',
       `S-box input ${i.toString(16).toUpperCase()}: output ${sbox[i].toString(16).toUpperCase()}`,
@@ -707,7 +715,13 @@ function renderDDT() {
 
       const cell = document.createElement('div');
       cell.className = 'ddt-cell';
-      cell.setAttribute('role', 'gridcell');
+      // These cells are CLICKABLE — clicking one opens the differential detail
+      // panel — so `button` is both the accurate role and the one that fixes
+      // three things at once: `gridcell` was invalid without a `row` ancestor
+      // (two critical axe failures), a bare div could not carry the label at
+      // all, and a focusable div with a click handler and no button role was
+      // not operable from the keyboard (WCAG 2.1.1) despite its tabindex.
+      cell.setAttribute('role', 'button');
       cell.setAttribute(
         'aria-label',
         `Input diff 0x${inputDiff.toString(16).toUpperCase()}, output diff 0x${outputDiff
@@ -724,6 +738,14 @@ function renderDDT() {
 
       cell.textContent = count > 0 ? count.toString() : '·';
       cell.addEventListener('click', () => showDDTInfo(inputDiff, outputDiff, count));
+      // A role="button" must respond to Enter and Space; a div does not do that
+      // for free the way a real <button> would.
+      cell.addEventListener('keydown', (e: KeyboardEvent) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          showDDTInfo(inputDiff, outputDiff, count);
+        }
+      });
       container.appendChild(cell);
     }
   }

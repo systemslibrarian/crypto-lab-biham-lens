@@ -1014,7 +1014,11 @@ h4 {
 
 .stage-legend {
   display: flex;
-  gap: 2rem;
+  /* Five items at ~130px plus 2rem gaps is 750px of content in a nowrap flex
+     row — it pushed the document to 485px in a 380px viewport (WCAG 1.4.10).
+     A legend is exactly the kind of content that should wrap. */
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
   justify-content: center;
   padding-top: 1rem;
   border-top: 1px solid var(--border);
@@ -1051,6 +1055,17 @@ h4 {
   grid-template-columns: repeat(16, 1fr);
   gap: 4px;
   max-width: 400px;
+}
+
+/* Both grids can scroll horizontally at narrow widths (`.sbox-grid` gets
+   `overflow-x: auto` below 768px, and its 20px cell floor exceeds the track
+   floor). A scrolling region holding no focusable content is unreachable from
+   the keyboard — WCAG 2.1.1 — so both carry `tabindex="0"` and need a visible
+   focus indicator of their own. */
+.sbox-grid:focus-visible,
+.ddt-grid:focus-visible {
+  outline: 2px solid var(--accent-tertiary);
+  outline-offset: 3px;
 }
 
 .sbox-cell {
@@ -1104,8 +1119,14 @@ h4 {
   border-left: 4px solid var(--danger);
 }
 
+/* NO `opacity` here. Fading the whole lane took its already-muted labels under
+   the AA floor — the "inactive" sub-line measured 3.47:1 in dark theme, and in
+   light theme the heading, the value and the sub-line all failed together. The
+   lane is not a disabled control, so 1.4.3's inactive-component exemption does
+   not apply: it is a labelled diagram a sighted reader is meant to read. The
+   grey left border and the words "inactive — no difference to propagate"
+   already say which lane is idle, which is what the fade was for. */
 .ddt-lane.idle {
-  opacity: 0.75;
   border-left: 4px solid var(--border-light);
 }
 
@@ -1463,6 +1484,21 @@ h4 {
   .trace-stages {
     flex-direction: column;
     gap: 0.5rem;
+  }
+
+  /* The four-column trace row has 220px of FIXED tracks before its two content
+     columns even start, so at 380px it pushed the document to 725px — WCAG
+     1.4.10 reflow, and axe has no rule for it. Stack the row instead: the
+     label, tag, state pair and difference read perfectly well one under the
+     other, and `minmax(0, 1fr)` (not a bare `1fr`) keeps the single track from
+     taking its minimum from the widest child all over again. */
+  .trace-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.4rem;
+  }
+
+  .diff-row {
+    flex-wrap: wrap;
   }
 
   .stage-arrow {

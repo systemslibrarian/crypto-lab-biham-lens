@@ -432,7 +432,7 @@
                 <div class="sbox-analysis">
                     <div class="sbox-grid-container">
                         <h3>S-box Substitution</h3>
-                        <div class="sbox-grid" id="sboxGrid" role="grid" aria-label="S-box substitution values"></div>
+                        <div class="sbox-grid" id="sboxGrid" role="group" tabindex="0" aria-label="S-box substitution values"></div>
                         <p class="grid-explanation">Input (outer number) → Output (colored square)</p>
                     </div>
 
@@ -441,7 +441,7 @@
                         <p class="ddt-explanation">
                             Rows: Input Difference • Columns: Output Difference • Counts out of 16 input pairs
                         </p>
-                        <div class="ddt-grid" id="ddtGrid" role="grid" aria-label="Difference Distribution Table"></div>
+                        <div class="ddt-grid" id="ddtGrid" role="group" tabindex="0" aria-label="Difference Distribution Table"></div>
                         <div id="ddtClickInfo" aria-live="polite" style="display: none; margin-top: 1rem;">
                             <p><strong>Clicked cell:</strong> ΔIn = <span id="ddtInputDiff">0</span>, ΔOut = <span id="ddtOutputDiff">0</span></p>
                             <p><strong>Count:</strong> <span id="ddtCount">0</span> out of 16 input pairs</p>
