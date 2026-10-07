@@ -16,7 +16,7 @@
 version: 2
 updates:
   - package-ecosystem: "npm"
-    directory: "/"
+    directory: "/demos/biham-lens"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
