@@ -6,17 +6,17 @@
   "scripts": {
     "dev": "vite",
     "typecheck": "tsc --noEmit",
-    "build": "tsc && vite build",
+    "build": "npm run test:publish-request && tsc && vite build",
     "preview": "vite preview",
     "test": "node --import tsx --test src/**/*.test.ts",
     "test:a11y": "playwright test",
-    "deploy": "vite build && gh-pages -d dist"
+    "deploy": "gh workflow run pages.yml --repo systemslibrarian/crypto-lab-biham-lens --ref main",
+    "test:publish-request": "node --test tests/publish-request.node.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.63.0",
     "@types/node": "^26.6.4",
-    "gh-pages": "^6.1.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vite": "^8.3.3"
