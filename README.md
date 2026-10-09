@@ -51,7 +51,7 @@ Systems and standards that must resist differential cryptanalysis or use concept
 
 ```bash
 git clone https://github.com/systemslibrarian/crypto-lab-biham-lens
-cd crypto-lab-biham-lens/demos/biham-lens
+cd crypto-lab-biham-lens
 npm install
 npm run dev
 ```
