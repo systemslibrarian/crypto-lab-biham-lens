@@ -206,6 +206,7 @@ body {
   border-bottom-color: var(--accent-primary);
   background-color: rgba(255, 59, 92, 0.05);
 }
+.tab-button[data-tab="feal"].active { background-color: transparent; }
 
 /* Tab Content */
 .tab-content {
@@ -1576,6 +1577,61 @@ h4 {
     padding: 0.5rem 0.4rem;
   }
 }
+
+/* Reduced motion */
+.feal-panel { max-width: 1120px; }
+.feal-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.feal-card { min-width: 0; background: var(--bg-secondary); border: 1px solid var(--border-light); border-radius: 10px; padding: 1.25rem; margin-bottom: 1rem; }
+.feal-card h3 { margin-bottom: .75rem; border-left: 3px solid var(--accent-tertiary); padding-left: .6rem; }
+.feal-card p { margin: .6rem 0; }
+.feal-card label { display: block; color: var(--text-secondary); font-weight: 600; margin-top: .65rem; }
+.feal-card input { background: var(--bg-tertiary); border: 1px solid var(--border-strong); border-radius: 5px; color: var(--text-primary); font: .9rem var(--mono); padding: .55rem; max-width: 100%; }
+.feal-card > input { display: block; width: 100%; margin-top: .25rem; }
+.feal-card button { border: 1px solid var(--accent-tertiary); border-radius: 5px; color: var(--text-primary); background: var(--bg-tertiary); cursor: pointer; font: 600 .9rem var(--sans); min-height: 44px; padding: .5rem .9rem; margin-top: .8rem; }
+.feal-card button:hover:not(:disabled) { background: var(--accent-primary-bg); }
+.feal-card button:disabled { opacity: .5; cursor: not-allowed; }
+.feal-card :is(input,button):focus-visible { outline: 3px solid var(--accent-tertiary); outline-offset: 2px; }
+.feal-card code, .feal-card output, .feal-card pre { font-family: var(--mono); overflow-wrap: anywhere; }
+.feal-card pre { white-space: pre-wrap; }
+.feal-card output { display: block; }
+.feal-table-wrap { max-width: 100%; overflow-x: auto; }
+.feal-card table { width: 100%; border-collapse: collapse; font: .83rem var(--mono); }
+.feal-card caption { text-align: left; color: var(--text-secondary); margin: .4rem 0; }
+.feal-card th, .feal-card td { border-bottom: 1px solid var(--border-light); padding: .4rem; text-align: left; white-space: nowrap; }
+.feal-card tr.feal-highlight { background: rgba(0, 217, 255, .08); }
+.feal-path { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .45rem; list-style: none; margin: .8rem 0; }
+.feal-path li { min-width: 0; background: var(--bg-tertiary); border-left: 3px solid var(--accent-tertiary); border-radius: 3px; padding: .4rem .55rem; }
+.feal-path span, .feal-path code { display: block; }
+.feal-path span { color: var(--text-secondary); font-size: .78rem; }
+.feal-path code { color: var(--accent-tertiary); font-size: .76rem; }
+.feal-controls { display: flex; flex-wrap: wrap; align-items: end; gap: .5rem 1rem; }
+.feal-controls label { margin: 0; }
+.feal-controls input { display: block; width: 8rem; margin-top: .2rem; }
+.feal-controls button { margin-top: 0; }
+.feal-metrics { display: flex; flex-wrap: wrap; gap: .5rem 2rem; font-family: var(--mono); color: var(--accent-tertiary); }
+.feal-evidence { margin: .8rem 0; }
+.feal-evidence summary { color: var(--accent-tertiary); cursor: pointer; font-weight: 700; padding: .5rem 0; min-height: 44px; }
+.feal-evidence summary:focus-visible { outline: 3px solid var(--accent-tertiary); outline-offset: 2px; }
+.feal-evidence .feal-table-wrap { margin-top: .5rem; }
+.feal-funnel { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .5rem; margin-top: 1rem; }
+.feal-funnel > div { border: 1px solid var(--border-strong); border-radius: 5px; padding: .6rem; }
+.feal-funnel strong { display: block; color: var(--text-primary); }
+.feal-funnel span { display: block; color: var(--text-secondary); }
+.feal-funnel small { display: block; color: var(--text-tertiary); font: .75rem var(--mono); margin-top: .3rem; overflow-wrap: anywhere; }
+.feal-verdict.ok { border-color: var(--success); }
+.feal-verdict.alarm { border-color: var(--danger); }
+.feal-verdict.ok #fealVerdictText { color: var(--success); font-weight: 700; }
+.feal-verdict.alarm #fealVerdictText { color: var(--danger); font-weight: 700; }
+.feal-badge { display: inline-block; padding: .25rem .5rem; border: 1px solid var(--accent-secondary); border-radius: 5px; font-weight: 700; }
+.feal-sample { border: 1px solid var(--border-strong); border-radius: 5px; background: var(--bg-tertiary); padding: .8rem; margin: 1rem 0; }
+.feal-sample h4 { margin-bottom: .6rem; }
+.feal-sample dl { display: grid; grid-template-columns: minmax(11rem, 1fr) minmax(0, 2fr); gap: .3rem 1rem; }
+.feal-sample dt { color: var(--text-secondary); }
+.feal-sample dd { font-family: var(--mono); color: var(--accent-tertiary); overflow-wrap: anywhere; }
+.feal-source { color: var(--text-secondary); font-size: .9rem; }
+.feal-panel a { color: var(--accent-tertiary); }
+@media (max-width: 780px) { .feal-grid { grid-template-columns: 1fr; } .feal-funnel { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 500px) { .feal-sample dl { grid-template-columns: 1fr; } .feal-path code { font-size: .7rem; } }
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {

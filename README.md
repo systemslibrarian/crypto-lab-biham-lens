@@ -2,7 +2,7 @@
 
 ## What It Is
 
-**Differential cryptanalysis** is a chosen-plaintext attack on block ciphers that exploits statistical biases in how plaintext differences propagate through encryption to recover key material. Co-invented by Eli Biham and Adi Shamir in 1990, it fundamentally transformed cryptography by proving that large key sizes and block sizes alone do not guarantee security — the underlying mathematical structure must be carefully designed. This demo implements the attack on a simplified 4-round SPN (Substitution-Permutation Network) cipher, demonstrating how observed differences between ciphertext pairs can betray the last round's subkey through biased differential characteristics.
+**Differential cryptanalysis** is a chosen-plaintext attack on block ciphers that exploits how plaintext differences propagate through encryption to recover key material. Co-invented by Eli Biham and Adi Shamir in 1990, it fundamentally transformed cryptography by proving that large key sizes and block sizes alone do not guarantee security — the underlying mathematical structure must be carefully designed. The first two panels demonstrate a statistical attack on a simplified 4-round SPN. The FEAL-4 panel applies round peeling to a published cipher with a probability-1 differential.
 
 ## When to Use It
 
@@ -20,6 +20,12 @@ Differential cryptanalysis is relevant as a cryptanalytic tool in these scenario
 **[systemslibrarian.github.io/crypto-lab-biham-lens](https://systemslibrarian.github.io/crypto-lab-biham-lens/)**
 
 The interactive browser demo lets you collect ciphertext pairs from a toy 4-round SPN cipher and run a real last-round key recovery attack. You choose plaintext differences, collect ~500 ciphertext pairs corresponding to those differences, and the demo analyzes the statistical bias in the resulting pairs to recover the last round's 8-bit subkey. The demo includes visualizations of how differences propagate through S-box substitution and bit permutation, interactive exploration of the Difference Distribution Table (DDT), and a historical timeline of the attack's discovery and impact.
+
+### FEAL-4 extension
+
+The **3 · FEAL-4** tab encrypts 64-bit blocks with FEAL-4's published 64-bit key schedule, traces a chosen difference through its four Feistel rounds, and attacks an encryption oracle in a Web Worker. The default 6 A pairs and 4 B pairs query **20 chosen plaintexts**; an expandable table shows every plaintext pair and oracle reply. A funnel shows surviving partial keys as rounds 4, 3, 2, and 1 are peeled. Every full candidate is then tested against **64 fresh ciphertexts** that were generated after recovery. The verdict shows one fresh plaintext, its ciphertext, and decryption with an equivalent key. These 64 verification queries are separate from the 20 attack queries.
+
+The result is **equivalent round-key and whitening material**, sufficient to decrypt unseen blocks. It is **not the 64-bit master key**: the attack never uses or inverts the key schedule. The FEAL engine is separate from the toy SPN engine because the latter ranks 256 subkeys by statistical bias, while FEAL filters a 32-bit effective round-key space by exact differences. Cipher output is cross-checked against [CrypTool 2's FEAL implementation](https://github.com/CrypToolProject/CrypTool-2/blob/main/CrypPlugins/FEAL/FEAL_Algorithms.cs). [Murphy's 1990 paper](https://doi.org/10.1007/BF00190801) describes master-key recovery with at most 20 chosen plaintexts; this panel uses a classroom round-peeling variant.
 
 ## What Can Go Wrong
 

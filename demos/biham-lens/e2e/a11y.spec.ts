@@ -4,7 +4,7 @@ import { boot, driveAllStates, NARROW } from './gate';
 /**
  * WCAG A/AA regression gate.
  *
- * All five tab panels are opened and driven — the differential trace stepped,
+ * All six tab panels are opened and driven — the differential trace stepped,
  * fully revealed and reset; the live attack run to BOTH verdicts (the weak
  * S-box recovering K4, the strong PRESENT S-box failing to separate the bias
  * from noise); the DDT clicked on an exploitable cell and on a trivial one; the

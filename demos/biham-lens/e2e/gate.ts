@@ -25,7 +25,7 @@ export const NARROW = { width: 380, height: 800 };
  *     nothing, and this lab renders almost everything from JS: the trace
  *     pipeline, the S-box grid, the 256-cell DDT, the timeline panels and the
  *     whole attack results section are empty or `display: none` markup until
- *     something is clicked. Four of the five tab panels are hidden at first
+ *     something is clicked. Five of the six tab panels are hidden at first
  *     paint, so a gate that scans only the untouched page has audited a fifth
  *     of the lab.
  *
@@ -120,7 +120,7 @@ export async function boot(page: Page, theme: 'dark' | 'light'): Promise<void> {
 
   // Everything below is rendered by JS, so an empty shell would otherwise scan
   // clean. Assert the tab strip and the trace pipeline really populated.
-  await expect(page.locator('[role="tablist"] [role="tab"]')).toHaveCount(5);
+  await expect(page.locator('[role="tablist"] [role="tab"]')).toHaveCount(6);
   await expect(page.locator('#tracePipeline .trace-row')).toHaveCount(13);
   await expect(page.locator('#sboxGrid .sbox-cell')).toHaveCount(16);
   await expect(page.locator('#ddtGrid .ddt-cell')).toHaveCount(256);
@@ -329,7 +329,7 @@ async function openTab(page: Page, id: string): Promise<void> {
 /**
  * Drive the lab through the states that render content, scanning each.
  *
- * All five tabs are opened, because four are `display: none` at first paint.
+ * All six tabs are opened, because five are `display: none` at first paint.
  * Within them both branches of the attack verdict are reached — the weak S-box
  * recovering K4 (success card) and the strong PRESENT S-box failing to separate
  * the bias from noise (failure card) — because a gate that only ever sees the
@@ -404,7 +404,22 @@ export async function driveAllStates(page: Page, theme: string): Promise<void> {
   await expect(page.locator('#pairStatus')).toContainText('0 pairs');
   await scan(page, `${theme} / pairs cleared`);
 
-  // --- Tab 3: S-box analysis ---------------------------------------------
+  // --- Tab 3: FEAL-4 ------------------------------------------------------
+  await openTab(page, 'feal');
+  await expect(page.locator('#fealTrace tbody tr')).toHaveCount(5);
+  await scan(page, `${theme} / FEAL-4 trace and setup`);
+  await page.locator('#fealCollect').click();
+  await expect(page.locator('#fealQueried')).toContainText('20 chosen plaintexts');
+  await scan(page, `${theme} / FEAL-4 pairs collected`);
+  await page.locator('#fealEvidence summary').click();
+  await expect(page.locator('#fealPairs tbody tr')).toHaveCount(10);
+  await scan(page, `${theme} / FEAL-4 oracle observations`);
+  await page.locator('#fealEvidence summary').click();
+  await page.locator('#fealRun').click();
+  await expect(page.locator('#fealVerdictText')).toHaveText('decrypts unseen ciphertext', { timeout: 120_000 });
+  await scan(page, `${theme} / FEAL-4 verified equivalent key`);
+
+  // --- Tab 4: S-box analysis ---------------------------------------------
   await openTab(page, 'sbox');
   await scan(page, `${theme} / sbox grid and DDT (weak)`);
 
@@ -447,7 +462,7 @@ export async function driveAllStates(page: Page, theme: string): Promise<void> {
   await expect(page.locator('#sboxAssessmentContent')).toContainText('Weak');
   await scan(page, `${theme} / weak S-box restored`);
 
-  // --- Tab 4: historical impact ------------------------------------------
+  // --- Tab 5: historical impact ------------------------------------------
   await openTab(page, 'history');
   await expect(page.locator('#timelineContent')).not.toBeEmpty();
   await scan(page, `${theme} / timeline step 0`);
@@ -457,7 +472,7 @@ export async function driveAllStates(page: Page, theme: string): Promise<void> {
     await scan(page, `${theme} / timeline step ${step}`);
   }
 
-  // --- Tab 5: why Serpent survived ---------------------------------------
+  // --- Tab 6: why Serpent survived ---------------------------------------
   await openTab(page, 'serpent');
   await scan(page, `${theme} / serpent`);
 

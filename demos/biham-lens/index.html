@@ -138,12 +138,12 @@
         <header class="cl-hero">
             <div class="cl-hero-main">
                 <h1 class="cl-hero-title">biham-lens</h1>
-                <p class="cl-hero-sub">Differential Cryptanalysis · Biham–Shamir 1990</p>
-                <p class="cl-hero-desc">Run a chosen-plaintext differential attack on a toy SPN cipher: seed plaintext XOR-differences, collect ciphertext pairs, and watch a biased characteristic through the S-boxes rank the correct last-round subkey to the top.</p>
+                <p class="cl-hero-sub">Differential Cryptanalysis · From toy SPN to FEAL-4</p>
+                <p class="cl-hero-desc">Trace XOR differences through a toy cipher, recover its last-round subkey, then carry the same idea to published FEAL-4 and test equivalent key material on unseen ciphertexts.</p>
             </div>
             <aside class="cl-hero-why" aria-label="Why it matters">
                 <span class="cl-hero-why-label">WHY IT MATTERS</span>
-                <p class="cl-hero-why-text">Differential cryptanalysis broke DES-like ciphers far faster than brute force and rewrote how block ciphers are designed. Every modern S-box is chosen to flatten these biases — the reason AES and Serpent survive attacks that shattered their predecessors.</p>
+                <p class="cl-hero-why-text">The FEAL-4 experiment uses 20 chosen plaintexts to recover material that decrypts new blocks. Its weak round difference shows why key size alone does not protect a cipher.</p>
             </aside>
             <button class="theme-toggle-btn" id="themeToggle" aria-label="Switch to light mode" hidden>🌙</button>
         </header>
@@ -151,6 +151,7 @@
         <nav class="tabs" role="tablist" aria-label="Demo sections">
             <button class="tab-button active" data-tab="trace" role="tab" aria-selected="true" aria-controls="trace" id="tab-trace">1 · Differential Trace</button>
             <button class="tab-button" data-tab="attack" role="tab" aria-selected="false" aria-controls="attack" id="tab-attack" tabindex="-1">2 · Live Attack</button>
+            <button class="tab-button" data-tab="feal" role="tab" aria-selected="false" aria-controls="feal" id="tab-feal" tabindex="-1">3 · FEAL-4</button>
             <button class="tab-button" data-tab="sbox" role="tab" aria-selected="false" aria-controls="sbox" id="tab-sbox" tabindex="-1">S-box Analysis</button>
             <button class="tab-button" data-tab="history" role="tab" aria-selected="false" aria-controls="history" id="tab-history" tabindex="-1">Historical Impact</button>
             <button class="tab-button" data-tab="serpent" role="tab" aria-selected="false" aria-controls="serpent" id="tab-serpent" tabindex="-1">Why Serpent Survived</button>
@@ -400,6 +401,75 @@
             </div>
         </div>
 
+        <!-- FEAL-4: a published cipher and a separate differential engine -->
+        <div id="feal" class="tab-content" role="tabpanel" aria-labelledby="tab-feal" tabindex="0">
+          <div class="tab-inner feal-panel">
+            <h2>FEAL-4 · A published cipher</h2>
+            <p class="tab-explanation">The toy SPN introduced chosen plaintexts and the last-round peel. FEAL-4 applies the same idea to a published 1987 cipher: a 64-bit Feistel block cipher whose round function uses addition modulo 256 and a two-bit rotation. Here a probability-1 difference filters key guesses instead of ranking a statistical bias.</p>
+            <div class="feal-grid">
+              <section class="feal-card" aria-labelledby="feal-cipher-heading">
+                <h3 id="feal-cipher-heading">1 · Encrypt a block</h3>
+                <label for="fealKey">64-bit master key · 16 hex digits</label>
+                <input id="fealKey" type="text" value="0123456789ABCDEF" maxlength="16" spellcheck="false" autocomplete="off" inputmode="text" />
+                <label for="fealPlaintext">64-bit plaintext · 16 hex digits</label>
+                <input id="fealPlaintext" type="text" value="0000000000000000" maxlength="16" spellcheck="false" autocomplete="off" inputmode="text" />
+                <button id="fealEncrypt" type="button">Encrypt and decrypt</button>
+                <p id="fealCipherStatus" role="status" aria-live="polite"></p>
+                <output id="fealCipherOutput"></output>
+              </section>
+              <section class="feal-card" aria-labelledby="feal-trace-heading">
+                <h3 id="feal-trace-heading">2 · Follow the difference</h3>
+                <p>Pair Δ = <code>8080000080800000</code>. Each row shows the XOR difference of the two round states.</p>
+                <ol id="fealPath" class="feal-path" aria-label="How the chosen difference reaches the second round">
+                  <li><span>Chosen pair</span><code id="fealPathInput">—</code></li>
+                  <li><span>After input XOR</span><code id="fealPathPre">—</code></li>
+                  <li><span>After round 1</span><code id="fealPathOne">—</code></li>
+                  <li><span>Round 2 f output</span><code id="fealPathTwo">—</code></li>
+                </ol>
+                <div class="feal-table-wrap" role="region" aria-label="Scrollable FEAL difference table" tabindex="0"><table id="fealTrace"><caption>Round-by-round FEAL-4 difference trace</caption><thead><tr><th>Round</th><th>Δ left</th><th>Δ right</th><th>Δ f output</th></tr></thead><tbody></tbody></table></div>
+                <p id="fealTraceClaim" role="status"></p>
+              </section>
+            </div>
+            <section class="feal-card feal-attack" aria-labelledby="feal-attack-heading">
+              <h3 id="feal-attack-heading">3 · Peel four rounds</h3>
+              <p>Collect two structured sets from an encryption oracle, then filter exact round-function differences in a Web Worker. Set A peels rounds 4 and 3; set B peels round 2; all observations constrain round 1.</p>
+              <div class="feal-controls">
+                <label for="fealCountA">A pairs <input id="fealCountA" type="number" min="2" max="30" step="1" value="6" /></label>
+                <label for="fealCountB">B pairs <input id="fealCountB" type="number" min="1" max="30" step="1" value="4" /></label>
+                <label for="fealSeed">Seed · 8 hex digits <input id="fealSeed" type="text" value="12345678" maxlength="8" spellcheck="false" /></label>
+                <button id="fealCollect" type="button">Collect</button>
+                <button id="fealRun" type="button" disabled>Run attack</button>
+                <button id="fealCancel" type="button" disabled>Cancel</button>
+              </div>
+              <p id="fealWarning">Below 6 A + 4 B pairs, the search may take much longer or fail.</p>
+              <p id="fealStatus" role="status" aria-live="polite">Collect chosen plaintexts to begin.</p>
+              <div class="feal-metrics"><span id="fealQueried">0 chosen plaintexts queried</span><span id="fealOps">0 F evaluations</span></div>
+              <details id="fealEvidence" class="feal-evidence" hidden>
+                <summary>Inspect oracle queries</summary>
+                <p>These plaintext and ciphertext pairs are the attack’s entire input. The Worker receives the observations; the 64-bit master key stays on this page.</p>
+                <div class="feal-table-wrap" role="region" aria-label="Scrollable FEAL oracle observations" tabindex="0">
+                  <table id="fealPairs"><caption>Chosen plaintext pairs and oracle replies</caption><thead><tr><th>Set</th><th>P</th><th>P′</th><th>C</th><th>C′</th></tr></thead><tbody></tbody></table>
+                </div>
+              </details>
+              <p>Each round starts with 2³² possible effective f-key values. The counts below are surviving partial key combinations; branching may increase a later count before the final consistency check.</p>
+              <div id="fealFunnel" class="feal-funnel" role="group" aria-label="Attack candidate funnel"></div>
+            </section>
+            <section id="fealVerdict" class="feal-card feal-verdict" aria-labelledby="feal-verdict-heading" hidden>
+              <h3 id="feal-verdict-heading">4 · Test on fresh ciphertexts</h3>
+              <p id="fealVerdictText"></p>
+              <p id="fealFreshCount"></p>
+              <p>The fresh blocks are generated after recovery and never used to filter candidates.</p>
+              <p id="fealEquivalentBadge" class="feal-badge">Equivalent key, not the 64-bit master key</p>
+              <p>The recovered round-key material and two whitening combinations decrypt blocks. The attack treats the round subkeys as independent and never uses the key schedule. <a href="https://doi.org/10.1007/BF00190801" target="_blank" rel="noopener noreferrer">Murphy (1990)</a> goes further and recovers the master key.</p>
+              <div id="fealFreshSample" class="feal-sample" hidden>
+                <h4>One block the attack never saw</h4>
+                <dl><dt>Fresh plaintext</dt><dd id="fealSamplePlaintext"></dd><dt>Oracle ciphertext</dt><dd id="fealSampleCiphertext"></dd><dt>Decrypted with equivalent key</dt><dd id="fealSampleDecrypted"></dd></dl>
+              </div>
+              <pre id="fealRecovered"></pre>
+            </section>
+            <p class="feal-source">Cipher specification and cross-check: <a href="https://github.com/CrypToolProject/CrypTool-2/blob/main/CrypPlugins/FEAL/FEAL_Algorithms.cs" target="_blank" rel="noopener noreferrer">CrypTool 2 FEAL implementation</a>. This is a classroom round-peeling variant, not a reproduction of Murphy’s exact procedure.</p>
+          </div>
+        </div>
         <!-- TAB 3: S-box Analysis -->
         <div id="sbox" class="tab-content" role="tabpanel" aria-labelledby="tab-sbox" tabindex="0">
             <div class="tab-inner">

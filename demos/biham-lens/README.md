@@ -41,3 +41,11 @@ The demo lets you run a real differential attack in the browser, ordered so the 
 ---
 
 *"So whether you eat or drink or whatever you do, do it all for the glory of God." — 1 Corinthians 10:31*
+
+## FEAL-4 extension
+
+The **3 · FEAL-4** tab moves from the toy SPN to the published 64-bit Feistel cipher. It uses FEAL-4's 64-bit key schedule for encryption and a separate oracle-only attack engine for recovery. Default collection requests 6 pairs with difference `8080000080800000` and 4 pairs with difference `0000000200000002`: 20 chosen plaintexts in all. An expandable table shows every query and oracle reply. The Worker peels rounds 4, 3 and 2, then solves round 1 and two whitening combinations. It checks every full survivor on 64 additional fresh ciphertexts before showing a success verdict and one concrete unseen decryption.
+
+The output is an **equivalent key**, not the 64-bit master key. It decrypts unseen blocks, but the attack does not use or invert FEAL's key schedule. Changing the key or pair counts discards the old collection. Run `npm test`, `npm run build`, and `npx playwright test e2e/claims.spec.ts --grep FEAL-4` to check the cipher vectors, oracle boundary, attack, and browser claims.
+
+Cipher specification: [CrypTool 2 FEAL implementation](https://github.com/CrypToolProject/CrypTool-2/blob/main/CrypPlugins/FEAL/FEAL_Algorithms.cs). Historical comparison: [Murphy, 1990](https://doi.org/10.1007/BF00190801), which goes further to recover the master key.

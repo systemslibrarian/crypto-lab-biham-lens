@@ -1,5 +1,111 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
+test.describe('FEAL-4', () => {
+  test('computed trace, 20 oracle queries, and verified equivalent-key verdict', async ({ page }) => {
+    await page.goto('.');
+    await page.locator('#tab-feal').click();
+    const traceRow = page.locator('#fealTrace tbody tr.feal-highlight');
+    const computed = (await traceRow.locator('td').nth(3).innerText()).trim();
+    expect(computed).toBe('02000000');
+    await expect(page.locator('#fealTrace tbody tr').nth(1).locator('td').nth(3)).toHaveText('00000000');
+    await expect(page.locator('#fealTraceClaim')).toContainText(`Computed round 2 f output Δ = ${computed}`);
+    await expect(page.locator('#fealCipherOutput')).toContainText('D88C4EF31769F53E');
+    await page.locator('#fealCollect').click();
+    await expect(page.locator('#fealQueried')).toHaveText('20 chosen plaintexts queried');
+    await expect(page.locator('#fealStatus')).toContainText('Every A pair computed round 2 f Δ = 02000000');
+    await page.locator('#fealEvidence summary').click();
+    await expect(page.locator('#fealPairs tbody tr')).toHaveCount(10);
+    const aPair = await page.locator('#fealPairs tbody tr').first().locator('td').allInnerTexts();
+    expect(aPair[0]).toBe('A');
+    expect(BigInt(`0x${aPair[1]}`) ^ BigInt(`0x${aPair[2]}`)).toBe(0x8080000080800000n);
+    const bPair = await page.locator('#fealPairs tbody tr').last().locator('td').allInnerTexts();
+    expect(bPair[0]).toBe('B');
+    expect(BigInt(`0x${bPair[1]}`) ^ BigInt(`0x${bPair[2]}`)).toBe(0x0000000200000002n);
+    await expect(page.locator('#fealVerdict')).toBeHidden();
+    await page.locator('#fealRun').click();
+    await expect(page.locator('#fealFreshCount')).toContainText('64/64 fresh ciphertexts checked', { timeout: 120_000 });
+    await expect(page.locator('#fealVerdictText')).toHaveText('decrypts unseen ciphertext');
+    await expect(page.locator('#fealEquivalentBadge')).toHaveText('Equivalent key, not the 64-bit master key');
+    await expect(page.locator('#fealFreshCount')).toContainText('20 attack queries + 64 later verification queries');
+    const freshPlain = (await page.locator('#fealSamplePlaintext').innerText()).trim();
+    const freshCipher = (await page.locator('#fealSampleCiphertext').innerText()).trim();
+    await expect(page.locator('#fealSampleDecrypted')).toHaveText(freshPlain);
+    const observed = await page.locator('#fealPairs tbody tr td:nth-child(2), #fealPairs tbody tr td:nth-child(3)').allInnerTexts();
+    expect(observed).not.toContain(freshPlain);
+    await page.locator('#fealPlaintext').fill(freshPlain);
+    await page.locator('#fealEncrypt').click();
+    await expect(page.locator('#fealCipherOutput')).toContainText(`Ciphertext: ${freshCipher}`);
+    await expect(page.locator('#fealVerdictText')).toHaveText('decrypts unseen ciphertext');
+    await expect(page.locator('#fealFunnel > div')).toHaveCount(4);
+    const queried = await page.locator('#fealQueried').innerText();
+    expect(queried).toContain('20 chosen plaintexts');
+    const ops = await page.locator('#fealOps').innerText();
+    const finalOps = Number(ops.match(/[\d,]+/)![0].replace(/,/g, ''));
+    const roundOneOps = Number((await page.locator('#fealFunnel small').last().innerText()).match(/[\d,]+/)![0].replace(/,/g, ''));
+    expect(finalOps).toBeGreaterThan(roundOneOps); // fresh verification is counted too
+    const full = Number((await page.locator('#fealFunnel > div').last().innerText()).match(/([\d,]+) survivors/)![1].replace(/,/g, ''));
+    const verified = Number((await page.locator('#fealFreshCount').innerText()).match(/; ([\d,]+) equivalent keys verified/)![1].replace(/,/g, ''));
+    expect(verified).toBe(full);
+    expect(verified).toBeGreaterThan(0);
+  });
+
+  test('invalid input and changed collection settings clear stale state', async ({ page }) => {
+    await page.goto('.');
+    await page.locator('#tab-feal').click();
+    await page.locator('#fealPlaintext').fill('not hex');
+    await page.locator('#fealEncrypt').click();
+    await expect(page.locator('#fealCipherStatus')).toContainText('Use exactly 16 hex digits');
+    await expect(page.locator('#fealCipherOutput')).toBeEmpty();
+    await page.locator('#fealPlaintext').fill('0000000000000000');
+    await page.locator('#fealCollect').click();
+    await expect(page.locator('#fealQueried')).toContainText('20 chosen plaintexts');
+    await page.locator('#fealCountA').fill('5');
+    await expect(page.locator('#fealRun')).toBeDisabled();
+    await expect(page.locator('#fealQueried')).toContainText('0 chosen plaintexts');
+    await expect(page.locator('#fealVerdict')).toBeHidden();
+    await expect(page.locator('#fealEvidence')).toBeHidden();
+    await page.locator('#fealCollect').click();
+    await expect(page.locator('#fealQueried')).toContainText('18 chosen plaintexts');
+    await page.locator('#fealKey').fill('bad');
+    await expect(page.locator('#fealRun')).toBeDisabled();
+    await expect(page.locator('#fealFunnel')).toBeEmpty();
+  });
+
+  test('cancel clears progress and marks retained counters incomplete', async ({ page }) => {
+    await page.goto('.');
+    await page.locator('#tab-feal').click();
+    await page.locator('#fealCollect').click();
+    await page.locator('#fealRun').click();
+    await page.locator('#fealCancel').click();
+    await expect(page.locator('#fealStatus')).toContainText('Attack cancelled');
+    await expect(page.locator('#fealFunnel')).toBeEmpty();
+    await expect(page.locator('#fealVerdict')).toBeHidden();
+    await expect(page.locator('#fealOps')).toContainText('incomplete');
+  });
+
+  test('a wrong fresh ciphertext rejects the recovered candidates', async ({ page }) => {
+    await page.addInitScript(() => {
+      const original = Worker.prototype.postMessage;
+      Worker.prototype.postMessage = function (message: unknown, transfer?: Transferable[]) {
+        const payload = message as { type?: string; ciphertexts?: bigint[] };
+        if (payload.type === 'verify-response' && payload.ciphertexts?.length) {
+          message = { ...payload, ciphertexts: payload.ciphertexts.map((c, i) => i === 0 ? c ^ 1n : c) };
+        }
+        return original.call(this, message, transfer ?? []);
+      };
+    });
+    await page.goto('.');
+    await page.locator('#tab-feal').click();
+    await page.locator('#fealCollect').click();
+    await page.locator('#fealRun').click();
+    await expect(page.locator('#fealVerdictText')).toHaveText('rejected: wrong on fresh ciphertext', { timeout: 120_000 });
+    await expect(page.locator('#fealFreshCount')).toContainText('0 equivalent keys verified');
+    await expect(page.locator('#fealEquivalentBadge')).toHaveText('Equivalent key, not the 64-bit master key');
+    await expect(page.locator('#fealFreshSample')).toBeHidden();
+    await expect(page.locator('#fealRecovered')).toBeEmpty();
+  });
+});
+
 /**
  * Claims gate.
  *
