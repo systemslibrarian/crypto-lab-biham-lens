@@ -1,3 +1,4 @@
+import { reference, referenceKeys, referenceDecrypt } from './present-reference';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 test.describe('FEAL-4', () => {
@@ -805,4 +806,303 @@ test('DES comparison uses the independently enumerated nontrivial DDT maximum', 
   await page.locator('#tab-serpent').click();
   const cells = page.locator('#serpent .comparison-table tbody tr').first().locator('td');
   await expect(cells.nth(1)).toHaveText(`${maximum} / ${desRows[0].length}`);
+});
+
+test.describe('PRESENT', () => {
+  test.setTimeout(180_000);
+  async function open(page: Page, act = 1) {
+    await page.goto('.');
+    await page.locator('#tab-present').click();
+    await page.locator(`.present-step[data-act="${act}"]`).click();
+  }
+  async function recover(page: Page) {
+    await page.locator('#present-run').click();
+    await expect(page.locator('#present-recovery')).toHaveAttribute('data-verdict', 'recovered', {
+      timeout: 120_000,
+    });
+  }
+  test('PRESENT rendered trace matches independent published permutation reference', async ({
+    page,
+  }) => {
+    await open(page, 4);
+    for (const [p, k] of [
+      ['0123456789ABCDEF', '00112233445566778899'],
+      ['FEDCBA9876543210', '13579BDF02468ACE1357'],
+    ]) {
+      await page.locator('#present-key').fill(k);
+      await page.locator('#present-plaintext').fill(p);
+      await page.locator('#present-compute').click();
+      const expected = reference(BigInt('0x' + p), BigInt('0x' + k))
+        .toString(16)
+        .toUpperCase()
+        .padStart(16, '0');
+      await expect(page.locator('#present-cipher')).toContainText(`ciphertext ${expected}`);
+      await expect(page.locator('#present-trace details')).toHaveCount(31);
+    }
+    await page.locator('#present-zero').click();
+    await expect(page.locator('#present-cipher')).toContainText('5579C1387B228445');
+    await page.locator('#present-trace details').last().locator('summary').click();
+    await expect(page.locator('#present-trace details').last()).toContainText(
+      'After bit permutation',
+    );
+  });
+  for (const [field, n] of [
+    ['key', 20],
+    ['plaintext', 16],
+  ] as const)
+    test(`PRESENT bad ${field} length fails closed`, async ({ page }) => {
+      await open(page, 4);
+      await page.locator('#present-' + field).fill('F');
+      await page.locator('#present-compute').click();
+      await expect(page.locator('#present-notice')).toContainText(`exactly ${n}`);
+      await expect(page.locator('#present-trace')).toBeEmpty();
+    });
+  test('PRESENT printed keys and DDT recompute independently', async ({ page }) => {
+    await open(page, 3);
+    const key = await page.locator('#present-key').inputValue(),
+      expected = referenceKeys(key);
+    const printed = await page
+      .locator('#present-keys tbody tr')
+      .evaluateAll((rows) => rows.map((r) => r.querySelectorAll('td')[2].textContent));
+    expect(printed).toEqual(expected);
+    await page.locator('#present-key-next').click();
+    await expect(page.locator('#present-key-step')).toContainText(`K2 ${expected[1]}`);
+    await page.locator('.present-step[data-act="1"]').click();
+    await page.locator('#present-act1 summary').click();
+    const table = await page
+      .locator('#present-ddt tbody tr')
+      .evaluateAll((rows) =>
+        rows.map((r) => Array.from(r.querySelectorAll('td'), (n) => Number(n.textContent))),
+      );
+    expect(Math.max(...table.slice(1).flat())).toBe(4);
+    await expect(page.locator('#present-conditions [data-verdict="pass"]')).toHaveCount(7);
+    await page.locator('.present-step[data-act="6"]').click();
+    await expect(page.locator('#present-k32')).toHaveValue(expected[31]);
+  });
+  test('PRESENT negative claim retains passing checks and alarm despite full recovery', async ({
+    page,
+  }) => {
+    await open(page, 6);
+    const key = await page.locator('#present-key').inputValue();
+    await expect(page.locator('#present-fixture-checks [data-check]')).toHaveCount(8);
+    await expect(page.locator('#present-fixture-checks [data-verdict="pass"]')).toHaveCount(8);
+    await recover(page);
+    await expect(page.locator('#present-fixture-checks [data-verdict="pass"]')).toHaveCount(8, {
+      timeout: 120_000,
+    });
+    await expect(page.locator('#present-recovery')).toHaveClass('present-alarm');
+    await expect(page.locator('#present-recovery')).toContainText(
+      'DESIGN CHECKS PASS — AND ONE ROUND KEY GIVES THE MASTER KEY',
+    );
+    await expect(page.locator('#present-recovery')).toContainText(
+      "PRESENT-80's key schedule does not keep the master key secret from anyone who learns a round key: K32 plus a 2¹⁶ search is the whole 80-bit key. That is why a last-round attack is a full break.",
+    );
+    await expect(page.locator('#present-progress')).toContainText(
+      '65536 candidates tried; 1 survivors',
+      { timeout: 120_000 },
+    );
+    await expect(page.locator('.present-survivor')).toHaveCount(1);
+    await expect(page.locator('.present-survivor')).toHaveAttribute('data-key', key.toUpperCase());
+    await expect(page.locator('#present-k32')).toHaveValue(referenceKeys(key)[31]);
+    const progress = await page.locator('#present-progress').innerText();
+    const elapsed = Number(progress.match(/Worker ([\d.]+) s/)![1]);
+    test.info().annotations.push({ type: 'worker-seconds', description: String(elapsed) });
+  });
+
+  test('PRESENT cancelled unwind marks counters incomplete', async ({ page }) => {
+    await open(page, 6);
+    await page.locator('#present-run').click();
+    await expect(page.locator('#present-progress')).toContainText('running', { timeout: 120_000 });
+    await page.locator('#present-cancel').click();
+    await expect(page.locator('#present-progress')).toContainText('incomplete', {
+      timeout: 120_000,
+    });
+    await expect(page.locator('.present-survivor')).toHaveCount(0);
+    await expect(page.locator('#present-recovery')).not.toHaveAttribute('data-verdict');
+    const progress = await page.locator('#present-progress').innerText();
+    await page.waitForTimeout(5_000);
+    await expect(page.locator('#present-progress')).toHaveText(progress);
+    await expect(page.locator('.present-survivor')).toHaveCount(0);
+    await expect(page.locator('#present-recovery')).not.toHaveAttribute('data-verdict');
+  });
+
+  test('PRESENT mismatched K32 yields zero survivors', async ({ page }) => {
+    await open(page, 6);
+    await page.locator('#present-zero').click();
+    await page.locator('#present-k32').fill('0000000000000000');
+    await page.locator('#present-run').click();
+    await expect(page.locator('#present-recovery')).toHaveAttribute('data-verdict', 'none', {
+      timeout: 120_000,
+    });
+    await expect(page.locator('#present-recovery')).toHaveClass('present-info');
+    await expect(page.locator('#present-recovery')).toContainText(
+      'no master key reproduces this pair',
+    );
+    await expect(page.locator('#present-progress')).toContainText(
+      '65536 candidates tried; 0 survivors',
+      { timeout: 120_000 },
+    );
+    await expect(page.locator('.present-survivor')).toHaveCount(0);
+  });
+
+  test('PRESENT leaving the tab mid-run terminates the Worker', async ({ page }) => {
+    await open(page, 6);
+    await page.locator('#present-run').click();
+    await expect(page.locator('#present-progress')).toContainText('running', { timeout: 120_000 });
+    await page.locator('#tab-feal').click();
+    await page.locator('#tab-present').click();
+    await expect(page.locator('#present-progress')).toContainText('Left PRESENT', {
+      timeout: 120_000,
+    });
+    await expect(page.locator('#present-progress')).toContainText('incomplete', {
+      timeout: 120_000,
+    });
+    const progress = await page.locator('#present-progress').innerText();
+    await page.waitForTimeout(5_000);
+    await expect(page.locator('#present-progress')).toHaveText(progress);
+    await expect(page.locator('.present-survivor')).toHaveCount(0);
+    await expect(page.locator('#present-recovery')).not.toHaveAttribute('data-verdict');
+  });
+
+  test('PRESENT key change retires a completed recovery', async ({ page }) => {
+    await open(page, 6);
+    await recover(page);
+    const key = await page.locator('#present-key').inputValue();
+    const other = (BigInt('0x' + key) ^ 1n).toString(16).padStart(20, '0');
+    await page.locator('#present-key').fill(other);
+    await expect(page.locator('#present-recovery')).not.toHaveAttribute('data-verdict');
+    await expect(page.locator('#present-recovery')).not.toHaveClass(/present-alarm/);
+    await expect(page.locator('.present-survivor')).toHaveCount(0);
+    await expect(page.locator('#present-k32')).toBeEmpty();
+    await expect(page.locator('#present-pair')).toBeEmpty();
+    await expect(page.locator('#present-notice')).toContainText('retired');
+  });
+
+  test('PRESENT re-entering the same key is a no-op', async ({ page }) => {
+    await open(page, 6);
+    await recover(page);
+    const verdict = await page.locator('#present-recovery').innerText();
+    const survivor = await page.locator('.present-survivor').innerText();
+    const key = await page.locator('.present-survivor').getAttribute('data-key');
+    const pair = await page.locator('#present-pair').innerText();
+    await page.locator('#present-key').dispatchEvent('input');
+    await expect(page.locator('#present-recovery')).toHaveAttribute('data-verdict', 'recovered', {
+      timeout: 120_000,
+    });
+    await expect(page.locator('#present-recovery')).toHaveText(verdict);
+    await expect(page.locator('.present-survivor')).toHaveCount(1);
+    await expect(page.locator('.present-survivor')).toHaveText(survivor);
+    await expect(page.locator('.present-survivor')).toHaveAttribute('data-key', key!);
+    await expect(page.locator('#present-pair')).toHaveText(pair);
+  });
+
+  test('PRESENT bad K32 length fails closed', async ({ page }) => {
+    await open(page, 6);
+    await page.locator('#present-k32').fill('0');
+    await page.locator('#present-run').click();
+    await expect(page.locator('#present-notice')).toContainText('exactly 16', { timeout: 120_000 });
+    await expect(page.locator('.present-survivor')).toHaveCount(0);
+    await expect(page.locator('#present-recovery')).not.toHaveAttribute('data-verdict');
+  });
+
+  test('PRESENT invariant 3 Worker receives only K32 and the known pair', async ({ page }) => {
+    await page.addInitScript(() => {
+      const messages: unknown[] = [];
+      (window as unknown as { presentMessages: unknown[] }).presentMessages = messages;
+      const original = Worker.prototype.postMessage;
+      Worker.prototype.postMessage = function (message: unknown, transfer?: Transferable[]) {
+        messages.push(structuredClone(message));
+        return original.call(this, message, transfer ?? []);
+      };
+    });
+    await open(page, 6);
+    const key = await page.locator('#present-key').inputValue();
+    await recover(page);
+    const messages = await page.evaluate((masterKey) => {
+      const posted = (window as unknown as { presentMessages: Record<string, unknown>[] })
+        .presentMessages;
+      const hasMasterKey = (value: unknown): boolean => {
+        if (typeof value === 'bigint') return value === BigInt('0x' + masterKey);
+        if (typeof value === 'string') return value.toUpperCase() === masterKey.toUpperCase();
+        return (
+          value !== null && typeof value === 'object' && Object.values(value).some(hasMasterKey)
+        );
+      };
+      return posted.map((message) => ({
+        keys: Object.keys(message),
+        pairKeys: Object.keys(message.pair as object),
+        hasMasterKey: hasMasterKey(message),
+      }));
+    }, key);
+    expect(messages).toHaveLength(1);
+    for (const message of messages) {
+      expect(message.keys).toEqual(['k32', 'pair']);
+      expect(message.pairKeys).toEqual(['plaintext', 'ciphertext']);
+      expect(message.hasMasterKey).toBe(false);
+    }
+  });
+
+  test('PRESENT highlighted wires map S-box 1 with bit 63 on the left', async ({ page }) => {
+    await open(page, 2);
+    await page.locator('#present-box').fill('1');
+    const svg = page.locator('#present-wires svg');
+    await expect(svg).toHaveAttribute('aria-label', /bit 63 on the left and bit 0 on the right/);
+    await expect(svg).toContainText('input bit (before pLayer)');
+    await expect(svg).toContainText('output bit (after pLayer)');
+    expect(await svg.locator('text').allTextContents()).toEqual([
+      'input bit (before pLayer)',
+      'output bit (after pLayer)',
+      '63',
+      '0',
+      '63',
+      '0',
+    ]);
+    const lines = await svg.locator('line[stroke-width="3"]').evaluateAll((nodes) =>
+      nodes.map((node) => ({
+        x1: Number(node.getAttribute('x1')),
+        x2: Number(node.getAttribute('x2')),
+        y1: Number(node.getAttribute('y1')),
+        y2: Number(node.getAttribute('y2')),
+      })),
+    );
+    expect(lines).toHaveLength(4);
+    expect(lines.map((line) => [63 - (line.x1 - 10) / 10, 63 - (line.x2 - 10) / 10])).toEqual([
+      [4, 1],
+      [5, 17],
+      [6, 33],
+      [7, 49],
+    ]);
+    for (const line of lines) expect(line.y1).toBeLessThan(line.y2);
+  });
+
+  test('PRESENT all four printed Appendix I vectors recompute independently', async ({ page }) => {
+    await open(page, 4);
+    const rows = page.locator('#present-vectors .present-vector');
+    await expect(rows).toHaveCount(4);
+    const inputs: string[][] = [];
+    for (const row of await rows.all()) {
+      const text = await row.innerText();
+      const parsed = text.match(
+        /^Plaintext ([0-9A-F]{16}); key ([0-9A-F]{20}); computed ciphertext ([0-9A-F]{16}); decrypt-back ([0-9A-F]{16});/,
+      );
+      expect(parsed).not.toBeNull();
+      const [, plaintext, key, ciphertext, decrypted] = parsed!;
+      inputs.push([plaintext, key]);
+      const expected = reference(BigInt('0x' + plaintext), BigInt('0x' + key));
+      expect(BigInt('0x' + ciphertext)).toBe(expected);
+      expect(decrypted).toBe(plaintext);
+      expect(BigInt('0x' + decrypted)).toBe(referenceDecrypt(BigInt('0x' + ciphertext), key));
+      expect(reference(BigInt('0x' + decrypted), BigInt('0x' + key))).toBe(
+        BigInt('0x' + ciphertext),
+      );
+      await expect(row).toHaveAttribute('data-verdict', 'pass');
+      await expect(row).toContainText('✓ matches CHES 2007 Appendix I');
+    }
+    expect(inputs).toEqual([
+      ['0'.repeat(16), '0'.repeat(20)],
+      ['0'.repeat(16), 'F'.repeat(20)],
+      ['F'.repeat(16), '0'.repeat(20)],
+      ['F'.repeat(16), 'F'.repeat(20)],
+    ]);
+  });
 });

@@ -15,3 +15,17 @@ test('PRESENT S-box conditions and spread are exhaustive',()=>{assert.equal(new 
 test('PRESENT full register trace unwinds every round',()=>{for(const key of [0n,0xffffffffffffffffffffn,0x00112233445566778899n,0xfedcba98765432100123n,0x13579bdf02468ace1357n]){const rows=keySchedule80(key);assert.equal(rows.length,32);for(const row of rows){assert.equal(row.key,row.register>>16n);assert.equal(unwind(row.register,row.round),key);if(row.round<32)assert.equal(updateKey80(row.register,row.round),rows[row.round].register);}}});
 test('PRESENT full 65536 suffix search includes upper half and unique survivor',()=>{for(const [key,low]of [[0x00112233445566778899n,0xd41an],[0xfedcba98765432100123n,0x948en],[0x13579bdf02468ace1357n,0xb403n]]){const last=keySchedule80(key)[31];assert.equal(last.register&65535n,low);assert.ok(low>=32768n);let final=0;const out=recoverFromK32(last.key,{plaintext:0x0123456789abcdefn,ciphertext:reference(0x0123456789abcdefn,key)},n=>{final=n;});assert.equal(out.tried,65536);assert.equal(final,65536);assert.deepEqual(out.survivors,[key]);}});
 test('PRESENT rejects malformed lengths instead of truncating',()=>{assert.equal(parseHex('0'.repeat(20),20),0n);for(const s of ['f'.repeat(19),'f'.repeat(21),'z'.repeat(20)])assert.throws(()=>parseHex(s,20));});
+
+test('PRESENT observation 1 receives four distinct boxes in one group', () => {
+  const spread = pLayerSpread();
+  assert.deepEqual(spread.input, Array(16).fill(4));
+  assert.deepEqual(spread.inputGroups, Array(16).fill(1));
+  assert.equal(spread.observation1, true);
+});
+
+test('PRESENT observation 3 reaches four distinct boxes in four distinct groups', () => {
+  const spread = pLayerSpread();
+  assert.deepEqual(spread.output, Array(16).fill(4));
+  assert.deepEqual(spread.outputGroups, Array(16).fill(4));
+  assert.equal(spread.observation3, true);
+});
