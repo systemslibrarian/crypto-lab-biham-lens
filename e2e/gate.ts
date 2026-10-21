@@ -120,7 +120,7 @@ export async function boot(page: Page, theme: 'dark' | 'light'): Promise<void> {
 
   // Everything below is rendered by JS, so an empty shell would otherwise scan
   // clean. Assert the tab strip and the trace pipeline really populated.
-  await expect(page.locator('[role="tablist"] [role="tab"]')).toHaveCount(6);
+  await expect(page.locator('[role="tablist"] [role="tab"]')).toHaveCount(7);
   await expect(page.locator('#tracePipeline .trace-row')).toHaveCount(13);
   await expect(page.locator('#sboxGrid .sbox-cell')).toHaveCount(16);
   await expect(page.locator('#ddtGrid .ddt-cell')).toHaveCount(256);
@@ -418,6 +418,18 @@ export async function driveAllStates(page: Page, theme: string): Promise<void> {
   await page.locator('#fealRun').click();
   await expect(page.locator('#fealVerdictText')).toHaveText('decrypts unseen ciphertext', { timeout: 120_000 });
   await scan(page, `${theme} / FEAL-4 verified equivalent key`);
+
+  // PRESENT is an added panel; the original SPN / FEAL paths stay intact.
+  await openTab(page, 'present');
+  for (let act = 1; act <= 6; act++) {
+    await page.locator(`.present-step[data-act="${act}"]`).click();
+    await expect(page.locator(`#present-act${act}`)).toBeVisible();
+    await scan(page, `${theme} / PRESENT act ${act}`);
+  }
+  await page.locator('#present-run').click();
+  await expect(page.locator('#present-recovery')).toHaveAttribute('data-verdict', 'recovered');
+  await expect(page.locator('#present-fixture-checks [data-verdict="pass"]')).toHaveCount(8);
+  await scan(page, `${theme} / PRESENT recovered master key`);
 
   // --- Tab 4: S-box analysis ---------------------------------------------
   await openTab(page, 'sbox');

@@ -152,12 +152,14 @@
             <button class="tab-button active" data-tab="trace" role="tab" aria-selected="true" aria-controls="trace" id="tab-trace">1 · Differential Trace</button>
             <button class="tab-button" data-tab="attack" role="tab" aria-selected="false" aria-controls="attack" id="tab-attack" tabindex="-1">2 · Live Attack</button>
             <button class="tab-button" data-tab="feal" role="tab" aria-selected="false" aria-controls="feal" id="tab-feal" tabindex="-1">3 · FEAL-4</button>
+            <button class="tab-button" data-tab="present" role="tab" aria-selected="false" aria-controls="present" id="tab-present" tabindex="-1">4 · PRESENT</button>
             <button class="tab-button" data-tab="sbox" role="tab" aria-selected="false" aria-controls="sbox" id="tab-sbox" tabindex="-1">S-box Analysis</button>
             <button class="tab-button" data-tab="history" role="tab" aria-selected="false" aria-controls="history" id="tab-history" tabindex="-1">Historical Impact</button>
             <button class="tab-button" data-tab="serpent" role="tab" aria-selected="false" aria-controls="serpent" id="tab-serpent" tabindex="-1">Why Serpent Survived</button>
         </nav>
 
         <main id="main-content">
+        <div id="present" class="tab-content" role="tabpanel" aria-labelledby="tab-present" tabindex="0"></div>
         <!-- TAB 1: Differential Trace (build-up: watch a difference survive XOR-K and mutate at the S-box) -->
         <div id="trace" class="tab-content active" role="tabpanel" aria-labelledby="tab-trace" tabindex="0">
             <div class="tab-inner">
@@ -366,7 +368,7 @@
                         The toy cipher is small enough that brute force is competitive. The win scales:
                         on real ciphers a differential characteristic can save you tens of bits of search.
                     </p>
-                    <table class="comparison-table">
+                    <div class="comparison-scroll" tabindex="0" role="region" aria-label="Differential attack complexity comparison"><table class="comparison-table">
                         <thead>
                             <tr>
                                 <th scope="col">Cipher</th>
@@ -395,7 +397,7 @@
                                 <td>Daemen &amp; Rijmen 2002</td>
                             </tr>
                         </tbody>
-                    </table>
+                    </table></div>
                     <p id="opCounter" class="muted">Operations performed by the most recent attack: <span class="mono" id="opCount">0</span></p>
                 </div>
             </div>
@@ -611,7 +613,7 @@
                 <div class="serpent-container">
                     <div class="cipher-comparison">
                         <h3>Cipher Defense Comparison</h3>
-                        <table class="comparison-table">
+                        <div class="comparison-scroll" tabindex="0" role="region" aria-label="Cipher defense comparison"><table class="comparison-table">
                             <thead>
                                 <tr>
                                     <th scope="col">Property</th>
@@ -646,7 +648,7 @@
                                     <td class="strong">Hardened by attack inventor</td>
                                 </tr>
                             </tbody>
-                        </table>
+                        </table></div>
                     </div>
 
                     <div class="portfolio-thread">

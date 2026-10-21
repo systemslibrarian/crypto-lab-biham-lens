@@ -21,6 +21,7 @@ import type { AttackResult } from './crypto/attack.js';
 import { seed as seedRng, getSeed as getRngSeed } from './crypto/rng.js';
 import { getPermutation } from './crypto/permutation.js';
 import { initFealTab } from './feal-tab.js';
+import { initPresentTab } from './present-tab.js';
 
 // ============================================================================
 // Application State
@@ -62,6 +63,7 @@ function initializeApp() {
   state.spnKey = generateKey(state.masterKey);
   setupEventListeners();
   initFealTab();
+  initPresentTab();
   syncSboxToggleUI();
   renderDDT();
   renderSBox();

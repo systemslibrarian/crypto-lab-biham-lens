@@ -181,7 +181,7 @@ body {
 
 .tab-button {
   background-color: transparent;
-  border: none;
+  border: 1px solid var(--control-border);
   color: var(--text-secondary);
   padding: 1rem 1.5rem;
   cursor: pointer;
@@ -206,7 +206,7 @@ body {
   border-bottom-color: var(--accent-primary);
   background-color: rgba(255, 59, 92, 0.05);
 }
-.tab-button[data-tab="feal"].active { background-color: transparent; }
+
 
 /* Tab Content */
 .tab-content {
@@ -1657,3 +1657,11 @@ h4 {
     display: block;
   }
 }
+
+:root{--control-border:var(--border-strong)}
+.present-inner [hidden]{display:none!important}.present-controls,.present-steps{display:flex;gap:.7rem;flex-wrap:wrap;margin:1rem 0}.present-inner label{display:grid;gap:.4rem;max-width:100%}.present-inner input,.present-step{font:inherit;background-color:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--control-border);border-radius:6px;padding:.7rem;max-width:100%}.present-step{cursor:pointer;text-transform:none}.present-step[aria-pressed="true"]{outline:2px solid var(--accent-primary);outline-offset:2px}.present-inner .btn{border:1px solid var(--control-border)}.present-inner :focus-visible{outline:2px solid var(--accent-primary);outline-offset:3px}.present-inner p,.present-inner details{overflow-wrap:anywhere;margin:.8rem 0}.present-cells,.present-map{display:grid;grid-template-columns:repeat(auto-fit,minmax(8rem,1fr));gap:.3rem}.present-cells span{padding:.5rem;border:1px solid var(--border-strong)}.present-scroll{max-width:100%;overflow:auto;margin:1rem 0}.present-scroll table{border-collapse:collapse;white-space:nowrap}.present-scroll th,.present-scroll td{padding:.45rem;border:1px solid var(--border-strong)}.present-inner summary{cursor:pointer;text-decoration:underline}.present-ok{color:#7ee3b3}.present-alarm{color:#ff9bae;border-left:3px solid #ff9bae;padding:.8rem}.present-info{color:var(--text-primary)}.present-selected{border-left:3px solid #ffd166;padding-left:.5rem}#present-wires svg{width:100%;height:auto}.present-act{margin:1.4rem 0}
+@media(max-width:640px){.present-controls{flex-direction:column}.present-steps{display:grid;grid-template-columns:1fr 1fr}#present-wires{display:none}.present-step{min-width:0}}
+
+.comparison-scroll{max-width:100%;overflow-x:auto}.comparison-scroll:focus-visible{outline:2px solid var(--accent-primary);outline-offset:3px}
+
+.cipher-comparison{min-width:0}

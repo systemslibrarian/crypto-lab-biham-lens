@@ -4,6 +4,8 @@
 
 **Differential cryptanalysis** is a chosen-plaintext attack on block ciphers that exploits how plaintext differences propagate through encryption to recover key material. Co-invented by Eli Biham and Adi Shamir in 1990, it fundamentally transformed cryptography by proving that large key sizes and block sizes alone do not guarantee security — the underlying mathematical structure must be carefully designed. The first two panels demonstrate a statistical attack on a simplified 4-round SPN. The FEAL-4 panel applies round peeling to a published cipher with a probability-1 differential.
 
+The toy’s strong S-box is PRESENT’s S-box; the PRESENT tab runs the full PRESENT-80 cipher and its reversible key schedule.
+
 ## When to Use It
 
 Differential cryptanalysis is relevant as a cryptanalytic tool in these scenarios:
@@ -26,6 +28,35 @@ The interactive browser demo lets you collect ciphertext pairs from a toy 4-roun
 The **3 · FEAL-4** tab encrypts 64-bit blocks with FEAL-4's published 64-bit key schedule, traces a chosen difference through its four Feistel rounds, and attacks an encryption oracle in a Web Worker. The default 6 A pairs and 4 B pairs query **20 chosen plaintexts**; an expandable table shows every plaintext pair and oracle reply. A funnel shows surviving partial keys as rounds 4, 3, 2, and 1 are peeled. Every full candidate is then tested against **64 fresh ciphertexts** that were generated after recovery. The verdict shows one fresh plaintext, its ciphertext, and decryption with an equivalent key. These 64 verification queries are separate from the 20 attack queries.
 
 The result is **equivalent round-key and whitening material**, sufficient to decrypt unseen blocks. It is **not the 64-bit master key**: the attack never uses or inverts the key schedule. The FEAL engine is separate from the toy SPN engine because the latter ranks 256 subkeys by statistical bias, while FEAL filters a 32-bit effective round-key space by exact differences. Cipher output is cross-checked against [CrypTool 2's FEAL implementation](https://github.com/CrypToolProject/CrypTool-2/blob/main/CrypPlugins/FEAL/FEAL_Algorithms.cs). [Murphy's 1990 paper](https://doi.org/10.1007/BF00190801) describes master-key recovery with at most 20 chosen plaintexts; this panel uses a classroom round-peeling variant.
+
+### PRESENT extension
+
+The **PRESENT** tab runs all 31 rounds, all 32 round keys, the published S-box and bit permutation, and inverse decryption. Six acts enumerate the DDT and Walsh table, draw the 64 wires, step the register, trace encryption, distinguish observed differences from the cited five-round theorem, and recover the master key from **already known K32** plus one pair by searching all 65,536 suffixes in a cancellable Worker. The Worker receives no master key.
+
+Theorem 1 is cited, not proved by the observed trace. Condition 4 as printed is not asserted: the computed single-bit Walsh entries include zero. Passing the design checks does not hide the master key from a holder of K32. This is a key-schedule consequence, not an attack obtaining the round key. PRESENT-128 is not implemented.
+
+## Build & Verify
+
+```bash
+npm ci
+npm run typecheck
+npm test
+npm run build
+npx playwright install chromium
+npm run test:a11y
+node scripts/check-present-mutations.mjs
+```
+
+PRESENT uses [Bogdanov et al., CHES 2007](https://crypto.orange-labs.fr/papers/ches2007-450.pdf), §3, §4.3, §5.1, Appendix I. Published plaintext / key / ciphertext vectors:
+
+| Plaintext | Key | Ciphertext |
+|---|---|---|
+| 0000000000000000 | 00000000000000000000 | 5579C1387B228445 |
+| 0000000000000000 | FFFFFFFFFFFFFFFFFFFF | E72C46C0F5945049 |
+| FFFFFFFFFFFFFFFF | 00000000000000000000 | A112FFC72F68417B |
+| FFFFFFFFFFFFFFFF | FFFFFFFFFFFFFFFFFFFF | 3333DCD3213210D2 |
+
+Labelled independent cross-checks (not published vectors): `0123456789ABCDEF / 00112233445566778899 → 1A6D783F0C184F4D`; `FEDCBA9876543210 / 0123456789ABCDEF0123 → CB7D344F360DE3B1`. The tests also check every permutation position, all byte-table inputs, every key-register reversal, exhaustive S-box facts, and three complete searches whose real suffixes are in the upper half. Browser tests recompute the cipher using a separate table-driven implementation, test fail-closed paths, and scan every act at desktop and 320px. Existing SPN and FEAL gates remain in place. Mutation evidence records builds, assertion kills, restored hashes and restored passing tests.
 
 ## What Can Go Wrong
 

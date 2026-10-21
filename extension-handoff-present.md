@@ -1,0 +1,11 @@
+# PRESENT extension handoff
+
+PRESENT-80 is now an executed cipher in its own seventh top-level tab, with six acts. It computes all 31 rounds, 32 keys, inverse decryption, full DDT/Walsh facts, the permutation wiring and observed active S-boxes. Theorem 1 is explicitly cited rather than claimed proved. A Worker receives only K32 and a known pair and enumerates all 65,536 unknown suffixes; the page compares survivors with the visible key afterward. No master key is sent to the Worker. The default search completed below 10 seconds in Chromium; the measured elapsed time is printed by the page.
+
+Verification: 36 unit tests (plus 2 publishing-command tests); all 34 browser tests passed across the full suite and the repaired phone rerun. New PRESENT acts also pass all accessibility checks at 320px. Ten mechanism mutations were built, killed by assertions, restored to identical artifact hashes and tested green; evidence is in mutation-evidence-present.json. The inverse-S-box mutation uses an identity lookup so it remains compilable and reaches the owning assertion rather than dying at an unused-import compiler diagnostic.
+
+The requested tab-border fix removes five obsolete active-tab baseline entries and the special FEAL override. The full mobile gate also exposed two existing wide comparison tables. They now have labelled keyboard-scroll wrappers and a shrinking grid item; their content and the original SPN, FEAL and Serpent engines are unchanged.
+
+Source review: Bogdanov et al., CHES 2007, §3, §4.3, §5.1 and Appendix I. Four published vectors plus independent mixed-input cross-checks pass. Condition 4 as printed is not asserted because the computed single-bit Walsh entries include zero.
+
+Catalog follow-up: propose chip PRESENT-80 (already accepted by the PRESENT vocabulary). This changes PRESENT from comment-only to implemented here. Return Path at b734008bf2b3d76c4fefaeb9fa948a6962f30fe1 and Matsui Line at ea5a22430b7f21ff2899ce21ae2b8e8173575940 use its S-box in toy ciphers; link their strong-box labels in a later pass. Matsui Line src/crypto/sbox.test.ts:10 and README.md cite the S-box as CHES Table 1, but that table is area requirements. That citation defect was reported, not changed here. Concept placement belongs to the catalog pass.
