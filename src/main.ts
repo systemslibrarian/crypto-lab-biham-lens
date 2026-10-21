@@ -1125,7 +1125,7 @@ const timelineContent = [
         <li>Secrets can be kept for decades (IBM's designers knew differential cryptanalysis before DES was published, and were required to stay quiet about it)</li>
         <li>Mathematical insight outlasts secrecy — Biham & Shamir's work is permanent</li>
         <li>Good cipher design raises the cost: the hardened S-boxes pushed the Biham–Shamir attack on full DES to ~2⁴⁷ chosen plaintexts — broken in theory, impractical in practice (16-round DES is attackable, just not affordably)</li>
-        <li>Defense is possible but requires foresight: Serpent's ultra-conservative design ensures safety</li>
+        <li>Serpent's conservative design adds a security margin; no round count guarantees immunity to every attack</li>
       </ul>
     `,
   },

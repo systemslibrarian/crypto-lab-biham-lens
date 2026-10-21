@@ -140,6 +140,7 @@
                 <h1 class="cl-hero-title">biham-lens</h1>
                 <p class="cl-hero-sub">Differential Cryptanalysis · From toy SPN to FEAL-4</p>
                 <p class="cl-hero-desc">Trace XOR differences through a toy cipher, recover its last-round subkey, then carry the same idea to published FEAL-4 and test equivalent key material on unseen ciphertexts.</p>
+          <p class="cl-hero-desc"><strong>Teaching lab: the small SPN is deliberately weak. FEAL-4 and PRESENT panels have separate scopes; results here are not a security claim for modern ciphers.</strong></p>
             </div>
             <aside class="cl-hero-why" aria-label="Why it matters">
                 <span class="cl-hero-why-label">WHY IT MATTERS</span>
@@ -607,7 +608,7 @@
             <div class="tab-inner">
                 <h2>Why Serpent Survived: Defense Against Differential Cryptanalysis</h2>
                 <p class="tab-explanation">
-                    Eli Biham designed Serpent specifically to be immune to differential cryptanalysis and other attacks he had discovered.
+                    Ross Anderson, Eli Biham and Lars Knudsen designed Serpent with a substantial margin against differential and linear cryptanalysis. Its 32 rounds are a design margin, not a proof of immunity.
                 </p>
 
                 <div class="serpent-container">
@@ -624,10 +625,10 @@
                             </thead>
                             <tbody>
                                 <tr>
-                                    <td>S-box Max DDT</td>
-                                    <td class="weak">8</td>
-                                    <td class="strong">4</td>
-                                    <td class="strong">4</td>
+                                    <td>Max nonzero-input DDT entry / inputs</td>
+                                    <td>16 / 64</td>
+                                    <td>4 / 256</td>
+                                    <td>4 / 16</td>
                                 </tr>
                                 <tr>
                                     <td>Rounds</td>
@@ -636,19 +637,20 @@
                                     <td class="strong">32</td>
                                 </tr>
                                 <tr>
-                                    <td>Differential Reach</td>
-                                    <td class="weak">8 rounds</td>
-                                    <td class="strong">Beyond attack</td>
-                                    <td class="strong">Beyond attack</td>
+                                    <td>What the comparison establishes</td>
+                                    <td>Full-round differential attack needs about 2⁴⁷ chosen plaintexts</td>
+                                    <td>S-box bounds alone do not prove whole-cipher security</td>
+                                    <td>Additional rounds provide a design margin, not immunity</td>
                                 </tr>
                                 <tr>
                                     <td>Design Philosophy</td>
-                                    <td>Proven secure (classified)</td>
+                                    <td>Differential resistance designed in; criteria initially secret</td>
                                     <td>Resistant to known attacks</td>
                                     <td class="strong">Hardened by attack inventor</td>
                                 </tr>
                             </tbody>
                         </table></div>
+                        <p>DDT entries are counts, so compare their input-space denominators. The zero input difference is excluded. Sources: <a href="https://csrc.nist.gov/pubs/fips/46-3/final">DES S-boxes (FIPS 46-3)</a>, <a href="https://csrc.nist.gov/pubs/fips/197/final">AES S-box (FIPS 197)</a>, and <a href="https://www.cl.cam.ac.uk/archive/rja14/Papers/serpent.pdf">the Serpent proposal</a>.</p>
                     </div>
 
                     <div class="portfolio-thread">
