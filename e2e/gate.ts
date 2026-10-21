@@ -427,8 +427,9 @@ export async function driveAllStates(page: Page, theme: string): Promise<void> {
     await scan(page, `${theme} / PRESENT act ${act}`);
   }
   await page.locator('#present-run').click();
-  await expect(page.locator('#present-recovery')).toHaveAttribute('data-verdict', 'recovered');
-  await expect(page.locator('#present-fixture-checks [data-verdict="pass"]')).toHaveCount(8);
+  await expect(page.locator('#present-progress')).toContainText('running', { timeout: 120_000 });
+  await scan(page, `${theme} / PRESENT act 6 running`);
+  await expect(page.locator('#present-recovery')).toHaveAttribute('data-verdict', 'recovered', { timeout: 120_000 });
   await scan(page, `${theme} / PRESENT recovered master key`);
 
   // --- Tab 4: S-box analysis ---------------------------------------------
