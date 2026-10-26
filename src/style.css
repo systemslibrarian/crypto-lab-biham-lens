@@ -1665,3 +1665,20 @@ h4 {
 .comparison-scroll{max-width:100%;overflow-x:auto}.comparison-scroll:focus-visible{outline:2px solid var(--accent-primary);outline-offset:3px}
 
 .cipher-comparison{min-width:0}
+
+/* Long assistance labels remain usable at narrow viewport widths. */
+#differentialMode {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  margin: .5rem 0 1rem;
+  padding: .65rem;
+  font: inherit;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--control-border);
+  border-radius: 6px;
+}
+#differentialMode:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 3px; }

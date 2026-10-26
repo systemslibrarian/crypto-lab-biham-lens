@@ -1,3 +1,4 @@
+import { permute } from './permutation.js';
 /**
  * Differential cryptanalysis attack engine
  * 
@@ -9,7 +10,7 @@
  * partially decrypt both ciphertexts, and check if the differential holds.
  */
 
-import { invertBothNibbles } from './sbox.js';
+import { applyBothNibbles, invertBothNibbles } from './sbox.js';
 import { encrypt, encryptRounds } from './spn.js';
 import type { SPNKey } from './spn.js';
 import { nextInt } from './rng.js';
@@ -184,23 +185,12 @@ export function performAttack(
     expectedRandomCount: pairCount / 256,
     results,
     correctKeyRank,
-    correctKeyBias: results[0].biasCount, // Get bias of best candidate
+    correctKeyBias: results.find(r => r.candidateKey === key.subkeys[4])!.biasCount,
   };
 }
 
-/**
- * Empirically derive the most likely difference observed *just before*
- * the last S-box, given a chosen plaintext difference.
- *
- * This is what the textbook calls a 3-round differential characteristic
- * for the 4-round cipher: we run many encryption pairs through the first
- * 3 rounds (XOR-K, S-box, permute), observe how often each difference
- * appears, and return the peak.
- *
- * Mathematically, this peak is what makes the attack work — at the
- * correct last-round key guess, the partial decryption will reveal this
- * differential more often than chance; at wrong guesses, the distribution
- * is roughly uniform.
+/** Exact fixed-key endpoint differential, for instructor inspection only.
+ * A characteristic fixes every intermediate difference; an endpoint sums trails.
  */
 export interface CharacteristicSample {
   outputDiff: number;
@@ -208,30 +198,50 @@ export interface CharacteristicSample {
   probability: number;
 }
 
-export function deriveCharacteristic(
-  key: SPNKey,
-  inputDiff: number,
-  samples: number = 4000,
-): CharacteristicSample[] {
-  const histogram = new Array(256).fill(0);
-
-  for (let i = 0; i < samples; i++) {
-    const p1 = nextInt(256);
-    const p2 = (p1 ^ inputDiff) & 0xFF;
-    // State after 3 rounds = state going into round 4's XOR-K + S-box.
-    // The differential we exploit is on this intermediate value.
-    const s1 = encryptRounds(p1, key, 3);
-    const s2 = encryptRounds(p2, key, 3);
-    histogram[s1 ^ s2]++;
+export function deriveCharacteristic(key: SPNKey, inputDiff: number, _samples = 256): CharacteristicSample[] {
+  const histogram = new Array<number>(256).fill(0);
+  for (let p = 0; p < 256; p++) {
+    histogram[encryptRounds(p, key, 3) ^ encryptRounds(p ^ inputDiff, key, 3)]++;
   }
+  return histogram.map((count, outputDiff) => ({ outputDiff, count, probability: count / 256 }))
+    .sort((a, b) => b.count - a.count);
+}
 
-  const ranked: CharacteristicSample[] = histogram.map((count, outputDiff) => ({
-    outputDiff,
-    count,
-    probability: count / samples,
-  }));
-  ranked.sort((a, b) => b.count - a.count);
-  return ranked;
+/** Public S-box/permutation preprocessing. No victim key or oracle input.
+ * Independent uniform round-input model; not a fixed-key probability theorem.
+ */
+export function publicDifferentialModel(inputDiff: number): CharacteristicSample[] {
+  const transitions = Array.from({ length: 256 }, (_, delta) => {
+    const counts = new Array<number>(256).fill(0);
+    for (let x = 0; x < 256; x++) counts[permute(applyBothNibbles(x) ^ applyBothNibbles(x ^ delta))]++;
+    return counts;
+  });
+  let distribution = new Array<number>(256).fill(0);
+  distribution[inputDiff] = 1;
+  for (let round = 0; round < 3; round++) {
+    const next = new Array<number>(256).fill(0);
+    distribution.forEach((p, delta) => {
+      if (p) transitions[delta].forEach((count, out) => { next[out] += p * count / 256; });
+    });
+    distribution = next;
+  }
+  return distribution.map((probability, outputDiff) => ({ outputDiff, probability, count: probability * 256 }))
+    .sort((a, b) => b.probability - a.probability);
+}
+
+export function exactTrails(key: SPNKey, inputDiff: number) {
+  const counts = new Map<string, number>();
+  for (let p = 0; p < 256; p++) {
+    const path = [inputDiff, ...[1, 2, 3].map(round => encryptRounds(p, key, round) ^ encryptRounds(p ^ inputDiff, key, round))];
+    const id = path.join(',');
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  return [...counts].map(([id, count]) => ({ differences: id.split(',').map(Number), count }))
+    .sort((a, b) => b.count - a.count);
+}
+
+export function distinctPairCount(pairs: Array<{ c1: number; c2: number }>): number {
+  return new Set(pairs.map(({c1, c2}) => Math.min(c1, c2) * 256 + Math.max(c1, c2))).size;
 }
 
 /**

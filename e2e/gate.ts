@@ -374,6 +374,7 @@ export async function driveAllStates(page: Page, theme: string): Promise<void> {
   await page.locator('#applySeed').click();
   await scan(page, `${theme} / seed applied`);
 
+  await page.locator('#differentialMode').selectOption('instructor');
   await page.locator('#deriveDiff').click();
   await expect(page.locator('#characteristicStatus')).not.toBeEmpty();
   await scan(page, `${theme} / characteristic re-derived`);
@@ -401,7 +402,7 @@ export async function driveAllStates(page: Page, theme: string): Promise<void> {
   await scan(page, `${theme} / learning-curve sweep`);
 
   await page.locator('#clearPairs').click();
-  await expect(page.locator('#pairStatus')).toContainText('0 pairs');
+  await expect(page.locator('#pairStatus')).toContainText('0 sampled pairs');
   await scan(page, `${theme} / pairs cleared`);
 
   // --- Tab 3: FEAL-4 ------------------------------------------------------

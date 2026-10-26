@@ -278,21 +278,20 @@
                     </div>
 
                     <div class="input-section">
-                        <h3>Step 1½: Target Differential</h3>
+                        <h3>Step 1½: Target Differential</h3><p>Source: Eli Biham and Adi Shamir, <cite>Differential Cryptanalysis of the Data Encryption Standard</cite> (1993; authors’ 2009 rendering), §§3.3–3.4, printed pp. 22–30 (PDF pp. 28–36). This toy uses dependent round keys, so independent-key model estimates need not equal fixed-key observations.</p>
                         <p class="muted">
                             We attack the last round by guessing K₄, partially decrypting, and counting
                             how many pairs hit the difference we expect <em>just before</em> the last S-box.
-                            A <em>3-round characteristic</em> is simply the difference that reliably survives
-                            the first three rounds — the peak of the propagation you watched in the Trace tab.
+                            An <em>endpoint differential</em> sums all intermediate difference trails. A <em>characteristic</em> fixes a difference at every round.
                         </p>
                         <div class="form-group">
                             <label for="outDiff">Expected Δ before last S-box (hex):</label>
                             <input type="text" id="outDiff" value="0B" maxlength="2" class="hex-input">
                         </div>
-                        <button id="deriveDiff" class="btn btn-secondary">Re-derive empirically from cipher</button>
+                        <label for="differentialMode">Preprocessing mode</label><select id="differentialMode"><option value="public">Attacker view — public differential model</option><option value="instructor">Instructor-assisted — exact hidden-state enumeration</option></select>
+                        <button id="deriveDiff" class="btn btn-secondary">Compute target differential</button>
                         <p id="characteristicStatus" class="status" aria-live="polite">
-                            This value is auto-derived on load by sampling the cipher. Hover the field to see
-                            where it comes from, or click <em>re-derive</em> to re-sample.
+                            The default uses the public differential model, without the victim key.
                         </p>
                     </div>
 
@@ -345,7 +344,7 @@
 
                     <div id="successMessage" style="display: none;" class="success-card">
                         <div class="success-icon">✓</div>
-                        <h4>Key Material Recovered!</h4>
+                        <h4>Top candidate matches instructor key</h4>
                         <p>The attack successfully identified the last round subkey using differential cryptanalysis.</p>
                         <p><strong>Actual Key K₄:</strong> <span class="mono" id="actualKey">0x00</span></p>
                         <p><strong>Recovered:</strong> <span class="mono" id="recoveredKeyText">0x00</span></p>
