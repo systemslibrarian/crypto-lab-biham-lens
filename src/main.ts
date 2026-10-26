@@ -1,3 +1,4 @@
+import { publicDifferentialModel, exactTrails, distinctPairCount } from './crypto/attack.js';
 /**
  * Main UI application for biham-lens
  *
@@ -322,14 +323,8 @@ function updateHiddenK4() {
 
 function updatePairStatus() {
   const status = byId('pairStatus');
-  const needed = 500 - state.collectedPairs.length;
-  if (needed <= 0) {
-    status.textContent = `${state.collectedPairs.length} pairs collected. Ready to attack!`;
-    status.style.color = 'var(--success)';
-  } else {
-    status.textContent = `${state.collectedPairs.length} pairs collected. Need ${needed} more for reliable recovery.`;
-    status.style.color = 'var(--text-secondary)';
-  }
+  status.textContent = `${state.collectedPairs.length} sampled pairs; ${distinctPairCount(state.collectedPairs)} distinct unordered pairs. At a nonzero input difference this 8-bit cipher has only 128 distinct pairs. Repeated samples reweight existing data; they are not fresh evidence.`;
+
 }
 
 function collectAndAddPairs(count: number) {
@@ -354,29 +349,22 @@ function hideResults() {
 // Empirical characteristic derivation
 // ============================================================================
 
-function deriveCharacteristicFromCipher(auto = false) {
-  const ranked = deriveCharacteristic(state.spnKey, state.selectedInputDiff, 4000);
+function deriveCharacteristicFromCipher(_auto = false) {
+  const instructor = byId<HTMLSelectElement>('differentialMode').value === 'instructor';
+  const ranked = instructor ? deriveCharacteristic(state.spnKey, state.selectedInputDiff) : publicDifferentialModel(state.selectedInputDiff);
   const best = ranked[0];
   state.selectedOutputDiff = best.outputDiff;
-  const outDiffInput = byId<HTMLInputElement>('outDiff');
-  outDiffInput.value = hex2(best.outputDiff);
-
-  const pct = (best.probability * 100).toFixed(2);
-  // Annotate the field itself so the target Δ is never an unexplained
-  // magic constant: hovering explains where it comes from and why it works.
-  outDiffInput.title =
-    `0x${hex2(best.outputDiff)} is the peak difference reached just before round 4's S-box, ` +
-    `occurring ${pct}% of the time (chance is ~0.4%). That bias is what the attack detects.`;
-
-  const second = ranked[1];
-  const ratio = second ? (best.count / Math.max(second.count, 1)).toFixed(2) : '∞';
-  byId('characteristicStatus').innerHTML =
-    (auto ? `Auto-derived on load: sampled ` : `Sampled `) +
-    `4 000 pairs through 3 rounds. Peak Δ = ` +
-    `<span class="mono">0x${hex2(best.outputDiff)}</span> with probability ` +
-    `<strong>${pct}%</strong> ` +
-    `(${ratio}× the runner-up). The attack will target this differential.`;
+  byId<HTMLInputElement>('outDiff').value = hex2(best.outputDiff);
+  byId<HTMLInputElement>('outDiff').title = 'Endpoint differential; sums all intermediate trails. Model assumptions are shown below.';
+  let detail = 'Attacker view: public S-box and permutation only. Independent uniform round-input model; this is not the exact probability for the victim key.';
+  if (instructor) {
+    const trail = exactTrails(state.spnKey, state.selectedInputDiff).find(t => t.differences[3] === best.outputDiff)!;
+    detail = `Instructor-assisted: inspected hidden intermediate states for all 256 inputs (${state.selectedInputDiff ? 128 : 256} unordered pairs). Endpoint count ${best.count}/256. One contributing trail ${trail.differences.map(hex2).join(' → ')} has count ${trail.count}/256; the endpoint sums every contributing trail.`;
+  }
+  byId('characteristicStatus').textContent = `${detail} Target Δ = 0x${hex2(best.outputDiff)}, ${(best.probability * 100).toFixed(2)}%. Ranking may be ambiguous; instructor key comparison is separate from the attack.`;
+  hideResults();
 }
+byId('differentialMode').addEventListener('change', () => deriveCharacteristicFromCipher());
 
 // ============================================================================
 // Attack execution
@@ -432,7 +420,7 @@ function showAttackResults(results: AttackResult[]) {
       `Top candidate 0x${hex2(recoveredKey)} ≠ actual K₄ 0x${hex2(correctK4)} ` +
       `(rank ${correctKeyRank}). The chosen differential 0x${hex2(state.selectedInputDiff)}→` +
       `0x${hex2(state.selectedOutputDiff)} may be low-probability, or you need more pairs. ` +
-      `Try <em>Derive empirically</em> in Step 1½, or add 500–1000 more pairs.`;
+      `Inspect the model assumptions or the explicitly instructor-assisted mode in Step 1½. Repeated pairs do not add distinct data.`;
   }
 }
 
@@ -855,7 +843,7 @@ function useDDTCellInAttack() {
   byId('characteristicStatus').innerHTML =
     `Seeded from DDT click: ΔIn=0x${hex2(byteIn)}, ΔOut=0x${hex2(byteOut)}. ` +
     `Note: this is a <em>single-round</em> differential; for 4 rounds you'll want to ` +
-    `<em>derive empirically</em> to find the actual peak the attack should target.`;
+    `use public-model preprocessing or explicitly instructor-assisted enumeration.`;
   switchTab('attack');
 }
 

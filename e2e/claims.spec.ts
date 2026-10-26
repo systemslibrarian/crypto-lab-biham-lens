@@ -128,12 +128,13 @@ const K4_FROM_PAGE = /^0x[0-9A-F]{2}$/;
 
 async function boot(page: Page): Promise<void> {
   await page.goto('.');
-  await expect(page.locator('#characteristicStatus')).toContainText('Auto-derived on load');
+  await expect(page.locator('#characteristicStatus')).toContainText('Attacker view: public S-box and permutation only');
 }
 
 async function openAttackTab(page: Page): Promise<void> {
   await page.locator('#tab-attack').click();
   await expect(page.locator('#attack')).toHaveClass(/active/);
+  await page.locator('#differentialMode').selectOption('instructor');
 }
 
 /** Reveal K₄ and return exactly what the page printed, e.g. "0x69". */
@@ -514,13 +515,13 @@ test.describe('live attack', () => {
 
     await reseed(page);
     await page.locator('#add500').click();
-    await expect(page.locator('#pairStatus')).toHaveText('500 pairs collected. Ready to attack!');
+    await expect(page.locator('#pairStatus')).toContainText('500 sampled pairs;');
     await page.locator('#runAttack').click();
 
     await expect(page.locator('#resultsSection')).toBeVisible();
     await expect(page.locator('#successMessage')).toBeVisible();
     await expect(page.locator('#failureMessage')).toBeHidden();
-    await expect(page.locator('#successMessage')).toContainText('Key Material Recovered!');
+    await expect(page.locator('#successMessage')).toContainText('Top candidate matches instructor key');
 
     // Four independent renderings of the same recovered byte, all cross-checked
     // against the K₄ the page printed when we clicked "reveal".
@@ -546,7 +547,7 @@ test.describe('live attack', () => {
     await reseed(page);
 
     const assertCounters = async () => {
-      const pairs = num(await page.locator('#pairStatus').innerText(), /^(\d+) pairs collected/);
+      const pairs = num(await page.locator('#pairStatus').innerText(), /^(\d+) sampled pairs/);
       const opCount = num(await page.locator('#opCount').innerText(), /^([\d,]+)$/);
       // 2 partial decryptions per pair, per candidate subkey, over 256 candidates.
       expect(opCount).toBe(pairs * 256 * 2);
@@ -580,17 +581,17 @@ test.describe('live attack', () => {
     expect(await assertCounters()).toBe(1600);
   });
 
-  test('the pair counter counts down to the 500 it asks for', async ({ page }) => {
+  test('the pair counter separates repeated samples from distinct data', async ({ page }) => {
     await boot(page);
     await openAttackTab(page);
     const status = page.locator('#pairStatus');
-    await expect(status).toHaveText('0 pairs collected. Need 500 more for reliable recovery.');
+    await expect(status).toContainText('0 sampled pairs;');
     await page.locator('#add100').click();
-    await expect(status).toHaveText('100 pairs collected. Need 400 more for reliable recovery.');
+    await expect(status).toContainText('100 sampled pairs;');
     await page.locator('#add1000').click();
-    await expect(status).toHaveText('1100 pairs collected. Ready to attack!');
+    await expect(status).toContainText('1100 sampled pairs;');
     await page.locator('#clearPairs').click();
-    await expect(status).toHaveText('0 pairs collected. Need 500 more for reliable recovery.');
+    await expect(status).toContainText('0 sampled pairs;');
     await expect(page.locator('#resultsSection')).toBeHidden();
   });
 
@@ -615,27 +616,19 @@ test.describe('live attack', () => {
     expect(second).toEqual(first);
   });
 
-  test('the target Δ, its tooltip and its prose all quote one derived peak', async ({ page }) => {
-    await boot(page);
-    await openAttackTab(page);
-    await page.locator('#deriveDiff').click();
-
+  test('exact instructor differential sums contributing trails and labels assistance', async ({ page }) => {
+    await boot(page); await openAttackTab(page);
     const status = await page.locator('#characteristicStatus').innerText();
-    expect(status).toContain('Sampled 4 000 pairs through 3 rounds');
-    const peakHex = status.match(/Peak Δ =\s*0x([0-9A-F]{2})/)![1];
-    const pct = num(status, /probability\s*([\d.]+)%/);
-    const ratio = num(status, /\(([\d.]+)× the runner-up\)/);
-
-    // Three renderings of one sample: the input value, its tooltip, the prose.
-    await expect(page.locator('#outDiff')).toHaveValue(peakHex);
-    const title = (await page.locator('#outDiff').getAttribute('title'))!;
-    expect(title).toContain(`0x${peakHex} is the peak difference`);
-    expect(num(title, /occurring ([\d.]+)% of the time/)).toBe(pct);
-
-    // A "peak" that is not above chance would not be a characteristic at all.
-    // Chance for a byte difference is 100/256 ≈ 0.39%.
-    expect(pct).toBeGreaterThan((100 / 256) * 4);
-    expect(ratio).toBeGreaterThanOrEqual(1);
+    expect(status).toContain('Instructor-assisted');
+    expect(status).toContain('all 256 inputs (128 unordered pairs)');
+    const endpoint = num(status, /Endpoint count (\d+)\/256/);
+    const trail = num(status, /has count (\d+)\/256/);
+    expect(trail).toBeLessThanOrEqual(endpoint);
+    const peak = status.match(/Target Δ = 0x([0-9A-F]{2})/)![1];
+    await expect(page.locator('#outDiff')).toHaveValue(peak);
+    await expect(page.locator('#outDiff')).toHaveAttribute('title', /sums all intermediate trails/);
+    await page.locator('#differentialMode').selectOption('public');
+    await expect(page.locator('#characteristicStatus')).toContainText('not the exact probability for the victim key');
   });
 
   test('running with no pairs refuses rather than inventing a verdict', async ({ page }) => {
@@ -734,13 +727,13 @@ test.describe('live attack', () => {
 
     await page.locator('#p1').fill('44');
     await expect(page.locator('#plainDiff')).toHaveText('0x07');
-    await expect(page.locator('#pairStatus')).toHaveText(
-      '0 pairs collected. Need 500 more for reliable recovery.',
+    await expect(page.locator('#pairStatus')).toContainText(
+      '0 sampled pairs;',
     );
     await expect(page.locator('#resultsSection')).toBeHidden();
   });
 
-  test('hardening the S-box costs the attack the key at the same effort', async ({ page }) => {
+  test('S-box changes retire evidence and report the observed rank without a universal recovery claim', async ({ page }) => {
     await boot(page);
     await openAttackTab(page);
     const k4 = await revealK4(page);
@@ -752,8 +745,8 @@ test.describe('live attack', () => {
     await openAttackTab(page);
     // Swapping the cipher must invalidate everything collected against the old one.
     await expect(page.locator('#activeSboxLabel')).toHaveText('Strong (PRESENT)');
-    await expect(page.locator('#pairStatus')).toHaveText(
-      '0 pairs collected. Need 500 more for reliable recovery.',
+    await expect(page.locator('#pairStatus')).toContainText(
+      '0 sampled pairs;',
     );
     await expect(page.locator('#resultsSection')).toBeHidden();
     await expect(page.locator('#attackStatus')).toContainText('S-box swapped to "strong"');
@@ -768,12 +761,11 @@ test.describe('live attack', () => {
     await page.locator('#add1000').click();
     await page.locator('#runAttack').click();
 
-    await expect(page.locator('#failureMessage')).toBeVisible();
-    await expect(page.locator('#successMessage')).toBeHidden();
-    expect(await page.locator('#recoveredKey').innerText()).not.toBe(k4);
-    expect(Number(await page.locator('#correctKeyRank').innerText())).toBeGreaterThan(1);
-    // The bias no longer separates: the winner barely leads the runner-up.
-    expect(Number(await page.locator('#biasMargin').innerText())).toBeLessThanOrEqual(2);
+    const rank = Number(await page.locator('#correctKeyRank').innerText());
+    expect(rank).toBeGreaterThanOrEqual(1); expect(rank).toBeLessThanOrEqual(256);
+    const matches = (await page.locator('#recoveredKey').innerText()) === k4;
+    await expect(page.locator(matches ? '#successMessage' : '#failureMessage')).toBeVisible();
+    await expect(page.locator('#pairStatus')).toContainText('distinct unordered pairs');
   });
 });
 
