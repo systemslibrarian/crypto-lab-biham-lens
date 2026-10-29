@@ -1169,6 +1169,12 @@ h4 {
   -webkit-overflow-scrolling: touch;
 }
 
+/* The zero cell's dot: drawn here so it is not DOM text, which keeps the
+   cell's accessible name equal to its aria-label. See src/main.ts. */
+.ddt-cell.ddt-0::before {
+  content: "\00b7";
+}
+
 .ddt-cell {
   aspect-ratio: 1;
   display: flex;

@@ -728,17 +728,19 @@ function renderDDT() {
       else if (count <= 6) cell.classList.add('ddt-5-6');
       else cell.classList.add('ddt-7-plus');
 
-      // The cell's own text is decoration: the aria-label above already states
-      // the input diff, the output diff and the count in full. axe 4.14's
-      // label-content-name-mismatch (WCAG 2.5.3 Label in Name) requires the
-      // accessible name to CONTAIN the visible text, and a zero cell renders
-      // U+00B7 where the name says "count 0" -- which is why only the .ddt-0
-      // cells were flagged. Marking the glyph aria-hidden leaves the label as
-      // the whole name and renders identically.
-      const face = document.createElement('span');
-      face.setAttribute('aria-hidden', 'true');
-      face.textContent = count > 0 ? count.toString() : '·';
-      cell.appendChild(face);
+      // A nonzero cell shows its count, and the aria-label above already says
+      // "count N", so the visible text is inside the name and the cell is
+      // fine. A zero cell showed U+00B7 instead, which "count 0" does not
+      // contain, and that is why only the .ddt-0 cells were flagged by axe
+      // 4.14's label-content-name-mismatch (WCAG 2.5.3 Label in Name).
+      //
+      // Marking the dot aria-hidden does NOT fix it -- measured: that version
+      // passed under axe 4.13 and failed under the 4.14 this bump installs,
+      // because the rule compares against what a SIGHTED user sees and
+      // hidden-from-assistive-technology is not hidden-from-sight. CSS
+      // generated content is not DOM text, so .ddt-0::before draws the dot
+      // and a zero cell carries no visible text at all.
+      cell.textContent = count > 0 ? count.toString() : '';
       cell.addEventListener('click', () => showDDTInfo(inputDiff, outputDiff, count));
       // A role="button" must respond to Enter and Space; a div does not do that
       // for free the way a real <button> would.
