@@ -728,7 +728,17 @@ function renderDDT() {
       else if (count <= 6) cell.classList.add('ddt-5-6');
       else cell.classList.add('ddt-7-plus');
 
-      cell.textContent = count > 0 ? count.toString() : '·';
+      // The cell's own text is decoration: the aria-label above already states
+      // the input diff, the output diff and the count in full. axe 4.14's
+      // label-content-name-mismatch (WCAG 2.5.3 Label in Name) requires the
+      // accessible name to CONTAIN the visible text, and a zero cell renders
+      // U+00B7 where the name says "count 0" -- which is why only the .ddt-0
+      // cells were flagged. Marking the glyph aria-hidden leaves the label as
+      // the whole name and renders identically.
+      const face = document.createElement('span');
+      face.setAttribute('aria-hidden', 'true');
+      face.textContent = count > 0 ? count.toString() : '·';
+      cell.appendChild(face);
       cell.addEventListener('click', () => showDDTInfo(inputDiff, outputDiff, count));
       // A role="button" must respond to Enter and Space; a div does not do that
       // for free the way a real <button> would.
