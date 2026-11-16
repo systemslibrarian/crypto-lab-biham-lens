@@ -800,6 +800,27 @@ test('DES comparison uses the independently enumerated nontrivial DDT maximum', 
   await expect(cells.nth(1)).toHaveText(`${maximum} / ${desRows[0].length}`);
 });
 
+test('the 2⁴⁷ full-DES figure is credited to the paper the timeline dates it to', async ({
+  page,
+}) => {
+  await page.goto('.');
+  await page.locator('#tab-attack').click();
+
+  // "Differential Cryptanalysis of the Full 16-Round DES", CRYPTO '92
+  // (pp. 487-496). The 1991 Journal of Cryptology paper is the one the
+  // timeline says reached 15 rounds, so the table must not cite it for 2⁴⁷.
+  const desRow = page.locator('#complexityPanel .comparison-table tbody tr').nth(1);
+  await expect(desRow.locator('td').nth(2)).toContainText('2⁴⁷');
+  await expect(desRow.locator('td').nth(3)).toContainText('CRYPTO ’92');
+  await expect(desRow.locator('td').nth(3)).not.toContainText('1991');
+
+  await page.locator('#tab-history').click();
+  await page.locator('#timelineStep1').click();
+  const timeline = page.locator('#timelineContent');
+  await expect(timeline).toContainText('Full 16-Round DES');
+  await expect(timeline).toContainText("CRYPTO '92");
+});
+
 test.describe('PRESENT', () => {
   test.setTimeout(180_000);
   async function open(page: Page, act = 1) {
